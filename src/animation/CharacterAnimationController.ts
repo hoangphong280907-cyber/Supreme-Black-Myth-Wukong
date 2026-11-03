@@ -1,4 +1,4 @@
-﻿import { Group } from 'three';
+﻿import { Group, MathUtils } from 'three';
 
 export interface CharacterRig {
   body: Group;
@@ -7,6 +7,9 @@ export interface CharacterRig {
   leftLeg: Group;
   rightLeg: Group;
 }
+
+const WALK_SPEED = 4.2;
+const RUN_SPEED = 6.2;
 
 export class CharacterAnimationController {
   private readonly rig: CharacterRig;
@@ -24,59 +27,63 @@ export class CharacterAnimationController {
   update(
     deltaTime: number,
     movementSpeed: number,
-    sprinting: boolean,
   ): void {
     if (deltaTime <= 0) return;
 
     this.elapsedTime += deltaTime;
 
-    const isMoving = movementSpeed > 0.18;
+    // Blend animation intensity based on actual velocity.
+    const movementTarget = MathUtils.clamp(
+      movementSpeed / 2.5,
+      0,
+      1,
+    );
 
-    const movementTarget = isMoving ? 1 : 0;
-    const runTarget = isMoving && sprinting ? 1 : 0;
+    const runTarget = MathUtils.clamp(
+      (movementSpeed - WALK_SPEED) /
+        (RUN_SPEED - WALK_SPEED),
+      0,
+      1,
+    );
 
     this.movementBlend = this.smoothBlend(
       this.movementBlend,
       movementTarget,
-      10,
+      9,
       deltaTime,
     );
 
     this.runBlend = this.smoothBlend(
       this.runBlend,
       runTarget,
-      8,
+      7,
       deltaTime,
     );
 
-    // Walking and running have different animation speeds.
-    const cadence = 8.5 + this.runBlend * 4.5;
+    // Stride cadence follows the character's real movement speed.
+    const cadence = 6.5 + movementSpeed * 1.05;
 
     this.walkPhase +=
       deltaTime * cadence * this.movementBlend;
 
-    const legAmplitude =
-      0.42 + this.runBlend * 0.18;
-
-    const armAmplitude = legAmplitude * 0.72;
+    const legAmplitude = 0.38 + this.runBlend * 0.14;
+    const armAmplitude = legAmplitude * 0.68;
 
     const step = Math.sin(this.walkPhase);
 
-    // Alternating legs.
     this.rig.leftLeg.rotation.x =
       step * legAmplitude * this.movementBlend;
 
     this.rig.rightLeg.rotation.x =
       -step * legAmplitude * this.movementBlend;
 
-    // Arms swing opposite to the legs.
     this.rig.leftArm.rotation.x =
       -step * armAmplitude * this.movementBlend;
 
     this.rig.rightArm.rotation.x =
       step * armAmplitude * this.movementBlend;
 
-    // Gentle breathing while idle and subtle body movement while walking.
+    // Breathing, stride bob and subtle torso sway.
     const idleBreathing =
       Math.sin(this.elapsedTime * 2.1) *
       0.012 *
@@ -84,14 +91,16 @@ export class CharacterAnimationController {
 
     const movementBob =
       Math.abs(Math.sin(this.walkPhase * 2)) *
-      0.035 *
+      0.04 *
       this.movementBlend;
 
     this.rig.body.position.y =
       idleBreathing + movementBob;
 
     this.rig.body.rotation.z =
-      step * 0.012 * this.movementBlend;
+      Math.sin(this.walkPhase) *
+      0.018 *
+      this.movementBlend;
   }
 
   private smoothBlend(

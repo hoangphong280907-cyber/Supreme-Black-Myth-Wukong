@@ -1,6 +1,7 @@
 import { CameraManager } from '../camera/CameraManager';
 import { InputManager } from '../input/InputManager';
 import { PlayerController } from '../entities/PlayerController';
+import { EnemyDummy } from '../entities/EnemyDummy';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
 import { GameRenderer } from '../renderer/GameRenderer';
 import { WorldScene } from '../scenes/WorldScene';
@@ -12,6 +13,7 @@ export class Game {
 
   private readonly input: InputManager;
   private readonly player: PlayerController;
+  private readonly enemyDummy: EnemyDummy;
 
   private readonly dodgeCooldownFill: HTMLElement | null;
   private readonly dodgeCooldownLabel: HTMLElement | null;
@@ -33,6 +35,14 @@ export class Game {
     );
 
     this.player = new PlayerController(this.world.scene);
+
+    // Place the training target on the stepping stone ahead of the player.
+    this.enemyDummy = new EnemyDummy(
+      this.world.scene,
+      Math.sin(1.8) * 0.65,
+      0.16,
+      7.9,
+    );
 
     const appRoot = viewport.parentElement;
 
@@ -90,6 +100,7 @@ export class Game {
 
     this.input.dispose();
     this.player.dispose();
+    this.enemyDummy.dispose();
 
     this.physics?.dispose();
     this.physics = null;
@@ -191,6 +202,7 @@ export class Game {
     );
 
     this.world.update(this.elapsedTime);
+    this.enemyDummy.update(deltaTime);
 
     this.renderer.render(
       this.world.scene,

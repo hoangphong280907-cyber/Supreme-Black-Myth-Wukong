@@ -1,4 +1,4 @@
-﻿import { Vector3 } from 'three';
+import { Vector3 } from 'three';
 
 import type {
   Collider,
@@ -269,6 +269,17 @@ export class PhysicsWorld {
       );
     }
 
+    // Training dummy blocker.
+    const enemyCollider = this.rapier.ColliderDesc
+      .capsule(0.58, 0.38)
+      .setTranslation(
+        Math.sin(1.8) * 0.65,
+        0.16 + 0.97,
+        7.9,
+      )
+      .setFriction(0);
+
+    this.world.createCollider(enemyCollider);
     // Pillars and their stone bases.
     for (const x of [-3, 3]) {
       this.addStaticBox(

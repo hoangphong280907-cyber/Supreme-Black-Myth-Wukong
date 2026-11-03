@@ -21,6 +21,7 @@ export class CharacterAnimationController {
   private runBlend = 0;
   private airborneBlend = 0;
   private landingImpact = 0;
+  private dodgeBlend = 0;
 
   constructor(rig: CharacterRig) {
     this.rig = rig;
@@ -32,6 +33,7 @@ export class CharacterAnimationController {
     verticalSpeed: number,
     grounded: boolean,
     landed: boolean,
+    dodging: boolean,
   ): void {
     if (deltaTime <= 0) return;
 
@@ -43,20 +45,20 @@ export class CharacterAnimationController {
       this.landingImpact *= Math.exp(-12 * deltaTime);
     }
 
-    const movementTarget = grounded
-      ? MathUtils.clamp(movementSpeed / 2.5, 0, 1)
-      : 0;
+    const movementTarget =
+      grounded && !dodging
+        ? MathUtils.clamp(movementSpeed / 2.5, 0, 1)
+        : 0;
 
-    const runTarget = grounded
-      ? MathUtils.clamp(
-          (movementSpeed - WALK_SPEED) /
-            (RUN_SPEED - WALK_SPEED),
-          0,
-          1,
-        )
-      : 0;
-
-    const airborneTarget = grounded ? 0 : 1;
+    const runTarget =
+      grounded && !dodging
+        ? MathUtils.clamp(
+            (movementSpeed - WALK_SPEED) /
+              (RUN_SPEED - WALK_SPEED),
+            0,
+            1,
+          )
+        : 0;
 
     this.movementBlend = this.smoothBlend(
       this.movementBlend,
@@ -74,12 +76,19 @@ export class CharacterAnimationController {
 
     this.airborneBlend = this.smoothBlend(
       this.airborneBlend,
-      airborneTarget,
+      grounded ? 0 : 1,
       12,
       deltaTime,
     );
 
-    // Walking cadence is based on actual movement speed.
+    this.dodgeBlend = this.smoothBlend(
+      this.dodgeBlend,
+      dodging ? 1 : 0,
+      24,
+      deltaTime,
+    );
+
+    // Movement animation follows actual velocity.
     const cadence = 6.5 + movementSpeed * 1.05;
 
     this.walkPhase +=
@@ -98,40 +107,47 @@ export class CharacterAnimationController {
       this.airborneBlend *
       MathUtils.clamp(-verticalSpeed / 4, 0, 1);
 
-    // Alternating leg movement while grounded.
+    // Legs: walk/run, jump/fall and dodge poses.
     this.rig.leftLeg.rotation.x =
       step * legAmplitude * this.movementBlend +
       risingBlend * 0.12 -
-      fallingBlend * 0.2;
+      fallingBlend * 0.2 +
+      this.dodgeBlend * 0.22;
 
     this.rig.rightLeg.rotation.x =
       -step * legAmplitude * this.movementBlend +
       risingBlend * 0.12 -
-      fallingBlend * 0.2;
+      fallingBlend * 0.2 +
+      this.dodgeBlend * 0.22;
 
-    // Arms swing during movement and react while airborne.
+    // Arms swing during movement and tuck during a dodge.
     this.rig.leftArm.rotation.x =
       -step * armAmplitude * this.movementBlend -
       risingBlend * 0.45 +
-      fallingBlend * 0.22;
+      fallingBlend * 0.22 -
+      this.dodgeBlend * 0.72;
 
     this.rig.rightArm.rotation.x =
       step * armAmplitude * this.movementBlend -
       risingBlend * 0.45 +
-      fallingBlend * 0.22;
+      fallingBlend * 0.22 -
+      this.dodgeBlend * 0.72;
 
     this.rig.leftArm.rotation.z =
-      -this.airborneBlend * 0.1;
+      -this.airborneBlend * 0.1 -
+      this.dodgeBlend * 0.28;
 
     this.rig.rightArm.rotation.z =
-      this.airborneBlend * 0.1;
+      this.airborneBlend * 0.1 +
+      this.dodgeBlend * 0.28;
 
-    // Idle breathing, walking bob and landing reaction.
+    // Body: breathing, stride bob, dodge tuck and landing response.
     const idleBreathing =
       Math.sin(this.elapsedTime * 2.1) *
       0.012 *
       (1 - this.movementBlend) *
-      (1 - this.airborneBlend);
+      (1 - this.airborneBlend) *
+      (1 - this.dodgeBlend);
 
     const movementBob =
       Math.abs(Math.sin(this.walkPhase * 2)) *
@@ -141,16 +157,21 @@ export class CharacterAnimationController {
     const landingDip = this.landingImpact * 0.08;
 
     this.rig.body.position.y =
-      idleBreathing + movementBob - landingDip;
+      idleBreathing +
+      movementBob -
+      landingDip -
+      this.dodgeBlend * 0.075;
 
     this.rig.body.rotation.x =
       -risingBlend * 0.08 +
       fallingBlend * 0.12 +
-      this.landingImpact * 0.1;
+      this.landingImpact * 0.1 +
+      this.dodgeBlend * 0.22;
 
     this.rig.body.rotation.z =
       step * 0.018 * this.movementBlend +
-      this.landingImpact * 0.025;
+      this.landingImpact * 0.025 -
+      this.dodgeBlend * 0.035;
   }
 
   private smoothBlend(

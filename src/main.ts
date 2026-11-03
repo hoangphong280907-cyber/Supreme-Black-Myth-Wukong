@@ -1,4 +1,4 @@
-﻿import './style.css';
+import './style.css';
 
 import { Game } from './app/Game';
 
@@ -34,8 +34,22 @@ app.innerHTML = `
   </header>
 
   <footer class="hud hud-bottom">
+    <div class="dodge-hud" id="dodge-hud">
+      <span class="dodge-key">Q</span>
+
+      <div class="dodge-details">
+        <div class="dodge-row">
+          <span class="dodge-title">DODGE</span>
+          <span id="dodge-cooldown-label">READY</span>
+        </div>
+
+        <div class="dodge-cooldown-track">
+          <span id="dodge-cooldown-fill"></span>
+        </div>
+      </div>
+    </div>
     <span class="bottom-mark">THE PATH TO THE WEST</span>
-    <span class="bottom-note">EARLY ENGINE PROTOTYPE · BUILD 0002</span>
+    <span class="bottom-note">EARLY ENGINE PROTOTYPE · BUILD 0006</span>
   </footer>
 `;
 

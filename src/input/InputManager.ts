@@ -1,4 +1,4 @@
-﻿export interface PointerDelta {
+export interface PointerDelta {
   x: number;
   y: number;
 }
@@ -16,6 +16,7 @@ export class InputManager {
   private wheelDelta = 0;
 
   private jumpRequested = false;
+  private dodgeRequested = false;
 
   private readonly movementKeys = new Set([
     'KeyW',
@@ -64,9 +65,17 @@ export class InputManager {
     );
   }
 
+  consumeDodgeRequest(): boolean {
+    const requested = this.dodgeRequested;
+    this.dodgeRequested = false;
+
+    return requested;
+  }
+
   consumeJumpRequest(): boolean {
     const requested = this.jumpRequested;
     this.jumpRequested = false;
+    this.dodgeRequested = false;
 
     return requested;
   }
@@ -105,9 +114,20 @@ export class InputManager {
     this.keys.clear();
     this.activePointerId = null;
     this.jumpRequested = false;
+    this.dodgeRequested = false;
   }
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
+    if (event.code === 'KeyQ') {
+      event.preventDefault();
+
+      if (!event.repeat) {
+        this.dodgeRequested = true;
+      }
+
+      return;
+    }
+
     if (event.code === 'Space') {
       event.preventDefault();
 
@@ -132,6 +152,7 @@ export class InputManager {
     this.keys.clear();
     this.activePointerId = null;
     this.jumpRequested = false;
+    this.dodgeRequested = false;
   };
 
   private readonly handlePointerDown = (event: PointerEvent): void => {

@@ -248,3 +248,73 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Dodge ability HUD */
+.dodge-hud {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 174px;
+  padding: 10px 14px;
+  border: 1px solid rgba(216, 183, 124, 0.22);
+  background: rgba(8, 12, 18, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.dodge-key {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(216, 183, 124, 0.55);
+  color: #e5c98f;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dodge-details {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 105px;
+}
+
+.dodge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dodge-title,
+#dodge-cooldown-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+}
+
+.dodge-title {
+  color: rgba(229, 223, 209, 0.6);
+}
+
+#dodge-cooldown-label {
+  color: #8be7ff;
+}
+
+.dodge-cooldown-track {
+  width: 100%;
+  height: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+#dodge-cooldown-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #76dcff;
+  box-shadow: 0 0 8px rgba(118, 220, 255, 0.7);
+  transform: scaleX(1);
+  transform-origin: left center;
+}

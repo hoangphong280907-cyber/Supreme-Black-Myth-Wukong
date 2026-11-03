@@ -1,4 +1,4 @@
-﻿import { CameraManager } from '../camera/CameraManager';
+import { CameraManager } from '../camera/CameraManager';
 import { InputManager } from '../input/InputManager';
 import { PlayerController } from '../entities/PlayerController';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
@@ -12,6 +12,9 @@ export class Game {
 
   private readonly input: InputManager;
   private readonly player: PlayerController;
+
+  private readonly dodgeCooldownFill: HTMLElement | null;
+  private readonly dodgeCooldownLabel: HTMLElement | null;
 
   private physics: PhysicsWorld | null = null;
 
@@ -30,6 +33,14 @@ export class Game {
     );
 
     this.player = new PlayerController(this.world.scene);
+
+    const appRoot = viewport.parentElement;
+
+    this.dodgeCooldownFill =
+      appRoot?.querySelector<HTMLElement>('#dodge-cooldown-fill') ?? null;
+
+    this.dodgeCooldownLabel =
+      appRoot?.querySelector<HTMLElement>('#dodge-cooldown-label') ?? null;
 
     window.addEventListener('resize', this.handleResize);
     this.handleResize();
@@ -86,6 +97,27 @@ export class Game {
     this.renderer.dispose();
   }
 
+  private updateDodgeHud(): void {
+    const remaining = this.player.dodgeCooldownRemaining;
+    const progress = this.player.dodgeCooldownProgress;
+
+    if (this.dodgeCooldownFill) {
+      this.dodgeCooldownFill.style.transform =
+        `scaleX(${progress})`;
+    }
+
+    if (this.dodgeCooldownLabel) {
+      if (this.player.isDodging) {
+        this.dodgeCooldownLabel.textContent = 'EVADING';
+      } else if (remaining > 0) {
+        this.dodgeCooldownLabel.textContent =
+          `${remaining.toFixed(1)}s`;
+      } else {
+        this.dodgeCooldownLabel.textContent = 'READY';
+      }
+    }
+  }
+
   private readonly handleResize = (): void => {
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -118,6 +150,13 @@ export class Game {
         this.input.verticalAxis,
       );
 
+    if (this.input.consumeDodgeRequest()) {
+      this.player.tryStartDodge(
+        movementDirection,
+        physics.grounded,
+      );
+    }
+
     const desiredMovement = this.player.update(
       deltaTime,
       movementDirection,
@@ -143,6 +182,8 @@ export class Game {
         physics.consumeLanding(),
       );
     }
+
+    this.updateDodgeHud();
 
     this.camera.update(
       this.player.position,

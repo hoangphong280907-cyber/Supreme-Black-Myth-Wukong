@@ -1,4 +1,5 @@
-﻿import {
+import {
+  BoxGeometry,
   BufferGeometry,
   CapsuleGeometry,
   Group,
@@ -26,6 +27,11 @@ const MAX_TURN_RATE = 10;
 const MAX_TURN_LEAN = 0.12;
 const MAX_FORWARD_LEAN = 0.07;
 
+const DODGE_DURATION = 0.24;
+const DODGE_DISTANCE = 2.1;
+const DODGE_COOLDOWN = 0.85;
+const INVULNERABILITY_DURATION = 0.16;
+
 export class PlayerController {
   private readonly scene: Scene;
 
@@ -48,6 +54,26 @@ export class PlayerController {
   private previousSpeed = 0;
   private forwardLean = 0;
   private turnLean = 0;
+
+  private readonly dodgeDirection = new Vector3();
+
+  private readonly dodgeTrailMaterial = new MeshStandardMaterial({
+    color: 0x8be7ff,
+    emissive: 0x187ca8,
+    emissiveIntensity: 1.8,
+    transparent: true,
+    opacity: 0.42,
+    depthWrite: false,
+    roughness: 0.35,
+    metalness: 0.2,
+  });
+
+  private readonly dodgeTrailMeshes: Mesh[] = [];
+
+  private dodging = false;
+  private dodgeElapsed = 0;
+  private dodgeCooldownTimer = 0;
+  private invulnerabilityTimer = 0;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -84,6 +110,76 @@ export class PlayerController {
     this.root.position.copy(position);
   }
 
+  get isDodging(): boolean {
+    return this.dodging;
+  }
+
+  get isInvulnerable(): boolean {
+    return this.invulnerabilityTimer > 0;
+  }
+
+  get dodgeCooldownRemaining(): number {
+    return this.dodgeCooldownTimer;
+  }
+
+  get dodgeCooldownProgress(): number {
+    return MathUtils.clamp(
+      1 - this.dodgeCooldownTimer / DODGE_COOLDOWN,
+      0,
+      1,
+    );
+  }
+
+  tryStartDodge(
+    movementDirection: Vector3,
+    grounded: boolean,
+  ): boolean {
+    if (
+      !grounded ||
+      this.dodging ||
+      this.dodgeCooldownTimer > 0
+    ) {
+      return false;
+    }
+
+    if (movementDirection.lengthSq() > 0.0001) {
+      this.dodgeDirection
+        .copy(movementDirection)
+        .normalize();
+    } else {
+      this.dodgeDirection.set(
+        Math.sin(this.root.rotation.y),
+        0,
+        Math.cos(this.root.rotation.y),
+      );
+    }
+
+    this.velocity.set(0, 0, 0);
+    this.previousSpeed = 0;
+
+    this.dodgeElapsed = 0;
+    this.dodging = true;
+
+    this.dodgeCooldownTimer = DODGE_COOLDOWN;
+    this.invulnerabilityTimer = INVULNERABILITY_DURATION;
+
+    this.dodgeTrailMaterial.opacity = 0.42;
+
+    for (const trail of this.dodgeTrailMeshes) {
+      trail.visible = true;
+    }
+
+    this.root.rotation.y = Math.atan2(
+      this.dodgeDirection.x,
+      this.dodgeDirection.z,
+    );
+
+    this.forwardLean = 0;
+    this.turnLean = 0;
+    this.leanPivot.rotation.set(0, 0, 0);
+
+    return true;
+  }
   update(
     deltaTime: number,
     movementDirection: Vector3,
@@ -91,6 +187,20 @@ export class PlayerController {
   ): Vector3 {
     if (deltaTime <= 0) {
       return new Vector3();
+    }
+
+    this.dodgeCooldownTimer = Math.max(
+      0,
+      this.dodgeCooldownTimer - deltaTime,
+    );
+
+    this.invulnerabilityTimer = Math.max(
+      0,
+      this.invulnerabilityTimer - deltaTime,
+    );
+
+    if (this.dodging) {
+      return this.updateDodge(deltaTime);
     }
 
     const hasInput = movementDirection.lengthSq() > 0.0001;
@@ -153,6 +263,7 @@ export class PlayerController {
       verticalSpeed,
       grounded,
       landed,
+      this.dodging,
     );
   }
 
@@ -185,6 +296,44 @@ export class PlayerController {
     }
   }
 
+  private updateDodge(deltaTime: number): Vector3 {
+    const previousProgress = this.dodgeElapsed / DODGE_DURATION;
+
+    this.dodgeElapsed = Math.min(
+      DODGE_DURATION,
+      this.dodgeElapsed + deltaTime,
+    );
+
+    const currentProgress = this.dodgeElapsed / DODGE_DURATION;
+
+    this.dodgeTrailMaterial.opacity =
+      0.42 * (1 - currentProgress);
+
+    const ease = (value: number): number =>
+      value * value * (3 - 2 * value);
+
+    const distance = DODGE_DISTANCE * (
+      ease(currentProgress) - ease(previousProgress)
+    );
+
+    const displacement = this.dodgeDirection
+      .clone()
+      .multiplyScalar(distance);
+
+    if (this.dodgeElapsed >= DODGE_DURATION) {
+      this.dodging = false;
+
+      for (const trail of this.dodgeTrailMeshes) {
+        trail.visible = false;
+      }
+
+      this.dodgeTrailMaterial.opacity = 0;
+      this.velocity.set(0, 0, 0);
+      this.previousSpeed = 0;
+    }
+
+    return displacement;
+  }
   private updateFacing(deltaTime: number): void {
     if (this.velocity.lengthSq() < 0.04) {
       return;
@@ -373,6 +522,23 @@ export class PlayerController {
       gold,
       0.37, 1.43, 0,
     );
+
+    const leftTrail = this.addPart(
+      new BoxGeometry(0.04, 0.04, 1.25),
+      this.dodgeTrailMaterial,
+      -0.22, 0.78, -0.72,
+    );
+
+    const rightTrail = this.addPart(
+      new BoxGeometry(0.04, 0.04, 1.25),
+      this.dodgeTrailMaterial,
+      0.22, 0.78, -0.72,
+    );
+
+    leftTrail.visible = false;
+    rightTrail.visible = false;
+
+    this.dodgeTrailMeshes.push(leftTrail, rightTrail);
   }
 
   private addPart(

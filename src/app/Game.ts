@@ -125,16 +125,25 @@ export class Game {
     );
 
     if (deltaTime > 0) {
+      const jumpRequested = this.input.consumeJumpRequest();
+
       const correctedPosition = physics.moveCharacter(
         this.player.position,
         desiredMovement,
         deltaTime,
+        jumpRequested,
       );
 
       this.player.setPosition(correctedPosition);
+
+      this.player.updateAnimationState(
+        deltaTime,
+        physics.grounded,
+        physics.verticalSpeed,
+        physics.consumeLanding(),
+      );
     }
 
-    // Camera follows the position resolved by physics.
     this.camera.update(
       this.player.position,
       deltaTime,

@@ -1,4 +1,4 @@
-import {
+﻿import {
   BufferGeometry,
   CapsuleGeometry,
   Group,
@@ -60,7 +60,6 @@ export class PlayerController {
 
     this.root.rotation.y = Math.PI;
 
-    // Separate movement lean from procedural animation.
     this.root.add(this.leanPivot);
     this.leanPivot.add(this.visual);
 
@@ -101,7 +100,6 @@ export class PlayerController {
       .copy(movementDirection)
       .multiplyScalar(hasInput ? targetSpeed : 0);
 
-    // Determine whether the player is reversing direction.
     const reversing =
       hasInput &&
       this.velocity.dot(movementDirection) < -0.1;
@@ -112,8 +110,6 @@ export class PlayerController {
         ? REVERSAL_ACCELERATION
         : ACCELERATION;
 
-    // Move current velocity toward desired velocity using
-    // a maximum acceleration per second.
     this.velocityDifference.subVectors(
       this.desiredVelocity,
       this.velocity,
@@ -135,15 +131,28 @@ export class PlayerController {
 
     this.updateFacing(deltaTime);
     this.updateMovementLean(deltaTime, currentSpeed);
-    this.updateAnimation(deltaTime, currentSpeed);
 
     this.previousSpeed = currentSpeed;
 
-    // Rapier remains responsible for the actual position.
     return new Vector3(
       this.velocity.x * deltaTime,
       0,
       this.velocity.z * deltaTime,
+    );
+  }
+
+  updateAnimationState(
+    deltaTime: number,
+    grounded: boolean,
+    verticalSpeed: number,
+    landed: boolean,
+  ): void {
+    this.animation.update(
+      deltaTime,
+      this.velocity.length(),
+      verticalSpeed,
+      grounded,
+      landed,
     );
   }
 
@@ -199,7 +208,6 @@ export class PlayerController {
 
     this.root.rotation.y += rotationStep;
 
-    // Lean into the turn, using the actual angular movement.
     const normalizedTurnRate = MathUtils.clamp(
       rotationStep / deltaTime / MAX_TURN_RATE,
       -1,
@@ -241,16 +249,6 @@ export class PlayerController {
       this.forwardLean,
       0,
       this.turnLean,
-    );
-  }
-
-  private updateAnimation(
-    deltaTime: number,
-    currentSpeed: number,
-  ): void {
-    this.animation.update(
-      deltaTime,
-      currentSpeed,
     );
   }
 

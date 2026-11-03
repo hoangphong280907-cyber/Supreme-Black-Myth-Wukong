@@ -15,6 +15,8 @@ export class InputManager {
   private pointerDeltaY = 0;
   private wheelDelta = 0;
 
+  private jumpRequested = false;
+
   private readonly movementKeys = new Set([
     'KeyW',
     'KeyA',
@@ -62,6 +64,13 @@ export class InputManager {
     );
   }
 
+  consumeJumpRequest(): boolean {
+    const requested = this.jumpRequested;
+    this.jumpRequested = false;
+
+    return requested;
+  }
+
   consumePointerDelta(): PointerDelta {
     const delta = {
       x: this.pointerDeltaX,
@@ -95,9 +104,20 @@ export class InputManager {
 
     this.keys.clear();
     this.activePointerId = null;
+    this.jumpRequested = false;
   }
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
+    if (event.code === 'Space') {
+      event.preventDefault();
+
+      if (!event.repeat) {
+        this.jumpRequested = true;
+      }
+
+      return;
+    }
+
     if (!this.movementKeys.has(event.code)) return;
 
     this.keys.add(event.code);
@@ -111,6 +131,7 @@ export class InputManager {
   private readonly handleBlur = (): void => {
     this.keys.clear();
     this.activePointerId = null;
+    this.jumpRequested = false;
   };
 
   private readonly handlePointerDown = (event: PointerEvent): void => {

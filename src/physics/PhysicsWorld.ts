@@ -9,6 +9,12 @@ import type {
 type RapierModule = typeof import('@dimforge/rapier3d-compat');
 
 const GRAVITY = 9.81;
+const JUMP_SPEED = 6.3;
+
+const JUMP_BUFFER_DURATION = 0.14;
+const COYOTE_TIME_DURATION = 0.12;
+
+const MAX_FALL_SPEED = 35;
 
 const CAPSULE_HALF_HEIGHT = 0.63;
 const CAPSULE_RADIUS = 0.32;
@@ -23,6 +29,13 @@ export class PhysicsWorld {
   private readonly characterController: KinematicCharacterController;
 
   private verticalVelocity = 0;
+  private jumpBufferTimer = 0;
+  private coyoteTimer = 0;
+
+  private isGrounded = false;
+  private hasInitializedGroundState = false;
+  private landedThisFrame = false;
+
   private disposed = false;
 
   private constructor(
@@ -69,7 +82,6 @@ export class PhysicsWorld {
       30 * Math.PI / 180,
     );
 
-    // The entrance platform is 0.7 units above the lower floor.
     this.characterController.enableAutostep(
       0.8,
       0.2,
@@ -78,10 +90,7 @@ export class PhysicsWorld {
 
     this.characterController.enableSnapToGround(0.3);
 
-    // Initialize the broad-phase after creating static colliders.
     this.world.step();
-
-
   }
 
   static async create(
@@ -89,16 +98,31 @@ export class PhysicsWorld {
   ): Promise<PhysicsWorld> {
     const rapier = await import('@dimforge/rapier3d-compat');
 
-    // Initialize embedded WebAssembly before creating the physics world.
     await rapier.init();
 
     return new PhysicsWorld(rapier, spawnPosition);
+  }
+
+  get grounded(): boolean {
+    return this.isGrounded;
+  }
+
+  get verticalSpeed(): number {
+    return this.verticalVelocity;
+  }
+
+  consumeLanding(): boolean {
+    const landed = this.landedThisFrame;
+    this.landedThisFrame = false;
+
+    return landed;
   }
 
   moveCharacter(
     currentRootPosition: Vector3,
     desiredMovement: Vector3,
     deltaTime: number,
+    jumpRequested = false,
   ): Vector3 {
     if (this.disposed) {
       throw new Error('PhysicsWorld has already been disposed.');
@@ -110,13 +134,44 @@ export class PhysicsWorld {
 
     const dt = Math.min(deltaTime, 0.05);
 
-    // Refresh scene queries after synchronizing the collider.
+    const wasGrounded = this.isGrounded;
 
+    // Remember a recent jump input.
+    if (jumpRequested) {
+      this.jumpBufferTimer = JUMP_BUFFER_DURATION;
+    } else {
+      this.jumpBufferTimer = Math.max(
+        0,
+        this.jumpBufferTimer - dt,
+      );
+    }
 
-    this.verticalVelocity = Math.max(
-      this.verticalVelocity - GRAVITY * dt,
-      -35,
-    );
+    // Allow a short jump window after leaving a ledge.
+    if (wasGrounded) {
+      this.coyoteTimer = COYOTE_TIME_DURATION;
+    } else {
+      this.coyoteTimer = Math.max(
+        0,
+        this.coyoteTimer - dt,
+      );
+    }
+
+    const canJump =
+      this.jumpBufferTimer > 0 &&
+      this.coyoteTimer > 0;
+
+    if (canJump) {
+      this.verticalVelocity = JUMP_SPEED;
+
+      this.jumpBufferTimer = 0;
+      this.coyoteTimer = 0;
+      this.isGrounded = false;
+    } else {
+      this.verticalVelocity = Math.max(
+        this.verticalVelocity - GRAVITY * dt,
+        -MAX_FALL_SPEED,
+      );
+    }
 
     const desiredTranslation = {
       x: desiredMovement.x,
@@ -132,6 +187,14 @@ export class PhysicsWorld {
     const correctedMovement =
       this.characterController.computedMovement();
 
+    // Stop upward movement if the character hits a ceiling.
+    if (
+      this.verticalVelocity > 0 &&
+      correctedMovement.y < desiredTranslation.y - 0.0001
+    ) {
+      this.verticalVelocity = 0;
+    }
+
     const currentColliderPosition =
       this.playerCollider.translation();
 
@@ -143,10 +206,18 @@ export class PhysicsWorld {
 
     this.playerCollider.setTranslation(nextPosition);
 
-    if (
-      this.characterController.computedGrounded() &&
-      this.verticalVelocity < 0
-    ) {
+    this.isGrounded =
+      this.characterController.computedGrounded();
+
+    // Detect landing transitions, but ignore initial ground contact.
+    this.landedThisFrame =
+      this.hasInitializedGroundState &&
+      !wasGrounded &&
+      this.isGrounded;
+
+    this.hasInitializedGroundState = true;
+
+    if (this.isGrounded && this.verticalVelocity < 0) {
       this.verticalVelocity = 0;
     }
 
@@ -228,5 +299,3 @@ export class PhysicsWorld {
     this.world.createCollider(collider);
   }
 }
-
-

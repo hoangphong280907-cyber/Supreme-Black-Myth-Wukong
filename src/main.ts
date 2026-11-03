@@ -29,13 +29,13 @@ app.innerHTML = `
     <div class="build-card">
       <span class="card-label">DEVELOPMENT BUILD</span>
       <strong>WORLD 00</strong>
-      <span class="card-detail">RENDER PIPELINE</span>
+      <span class="card-detail">PLAYER PHYSICS</span>
     </div>
   </header>
 
   <footer class="hud hud-bottom">
     <span class="bottom-mark">THE PATH TO THE WEST</span>
-    <span class="bottom-note">EARLY ENGINE PROTOTYPE · BUILD 0001</span>
+    <span class="bottom-note">EARLY ENGINE PROTOTYPE · BUILD 0002</span>
   </footer>
 `;
 
@@ -45,17 +45,7 @@ if (!viewport) {
   throw new Error('Game viewport was not found.');
 }
 
-try {
-  const game = new Game(viewport);
-
-  game.start();
-
-  window.addEventListener(
-    'pagehide',
-    () => game.dispose(),
-    { once: true },
-  );
-} catch (error) {
+const showRuntimeError = (error: unknown): void => {
   console.error('Game initialization failed:', error);
 
   const message =
@@ -74,4 +64,21 @@ try {
 
   errorPanel.append(heading, detail);
   app.appendChild(errorPanel);
+};
+
+try {
+  const game = new Game(viewport);
+
+  window.addEventListener(
+    'pagehide',
+    () => game.dispose(),
+    { once: true },
+  );
+
+  void game.start().catch((error: unknown) => {
+    game.dispose();
+    showRuntimeError(error);
+  });
+} catch (error) {
+  showRuntimeError(error);
 }

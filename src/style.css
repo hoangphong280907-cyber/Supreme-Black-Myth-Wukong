@@ -1,0 +1,250 @@
+﻿:root {
+  font-family: Inter, "Segoe UI", sans-serif;
+  color: #f2eee4;
+  background: #080c12;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  min-width: 320px;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  min-height: 100vh;
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 480px;
+  overflow: hidden;
+  isolation: isolate;
+  background: #080c12;
+}
+
+#game-viewport {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.game-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#app::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(5, 8, 14, 0.82) 0%,
+      rgba(5, 8, 14, 0.38) 42%,
+      transparent 78%
+    ),
+    linear-gradient(
+      0deg,
+      rgba(5, 8, 14, 0.76) 0%,
+      transparent 35%,
+      rgba(5, 8, 14, 0.18) 100%
+    );
+}
+
+.hud {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.hud-top {
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: clamp(30px, 6vw, 82px);
+}
+
+.brand {
+  max-width: 700px;
+}
+
+.brand-kicker {
+  display: block;
+  margin-bottom: 24px;
+  color: #d8b77c;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.34em;
+}
+
+.brand h1 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(42px, 6vw, 82px);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: 0.025em;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+.brand h1 span {
+  display: block;
+  margin-top: 10px;
+  color: #d8b77c;
+}
+
+.brand p {
+  max-width: 410px;
+  margin-top: 25px;
+  color: rgba(235, 231, 220, 0.74);
+  font-size: 14px;
+  line-height: 1.8;
+  letter-spacing: 0.06em;
+}
+
+.build-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 9px;
+  margin-top: 8px;
+  padding: 12px 0 12px 20px;
+  border-left: 1px solid rgba(216, 183, 124, 0.55);
+  text-align: right;
+}
+
+.card-label,
+.card-detail {
+  color: rgba(229, 223, 209, 0.6);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+}
+
+.build-card strong {
+  color: #e5c98f;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+}
+
+.hud-bottom {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px clamp(30px, 6vw, 82px);
+  border-top: 1px solid rgba(216, 183, 124, 0.16);
+}
+
+.bottom-mark {
+  color: #d8b77c;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+}
+
+.bottom-note {
+  color: rgba(229, 223, 209, 0.52);
+  font-size: 9px;
+  letter-spacing: 0.17em;
+}
+
+.runtime-error {
+  position: absolute;
+  z-index: 5;
+  inset: auto 20px 20px;
+  padding: 20px;
+  border: 1px solid #a94e4e;
+  background: rgba(30, 12, 16, 0.96);
+  color: #ffe9e9;
+}
+
+.runtime-error h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.runtime-error code {
+  overflow-wrap: anywhere;
+  color: #ffc2c2;
+}
+
+@media (max-width: 720px) {
+  .hud-top {
+    padding: 32px 24px;
+  }
+
+  .brand-kicker {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+  }
+
+  .brand h1 {
+    font-size: clamp(38px, 10vw, 60px);
+  }
+
+  .brand p {
+    max-width: 260px;
+    font-size: 12px;
+  }
+
+  .build-card {
+    display: none;
+  }
+
+  .hud-bottom {
+    flex-direction: column;
+    gap: 8px;
+    padding: 18px 24px;
+  }
+
+  .bottom-note {
+    font-size: 8px;
+  }
+
+  #app::before {
+    background:
+      linear-gradient(
+        90deg,
+        rgba(5, 8, 14, 0.68),
+        rgba(5, 8, 14, 0.08)
+      ),
+      linear-gradient(
+        0deg,
+        rgba(5, 8, 14, 0.8),
+        transparent 48%
+      );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}

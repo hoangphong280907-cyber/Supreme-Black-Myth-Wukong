@@ -12,15 +12,24 @@
 
 import type { Scene } from 'three';
 
+import { CharacterAnimationController } from '../animation/CharacterAnimationController';
+
 export class PlayerController {
   private readonly scene: Scene;
+
   private readonly root = new Group();
   private readonly visual = new Group();
 
+  private readonly leftArmPivot = new Group();
+  private readonly rightArmPivot = new Group();
+
+  private readonly leftLegPivot = new Group();
+  private readonly rightLegPivot = new Group();
+
+  private readonly animation: CharacterAnimationController;
+
   private readonly velocity = new Vector3();
   private readonly desiredVelocity = new Vector3();
-
-  private walkTime = 0;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -33,9 +42,19 @@ export class PlayerController {
     );
 
     this.root.rotation.y = Math.PI;
+
     this.root.add(this.visual);
 
     this.createCharacter();
+
+    this.animation = new CharacterAnimationController({
+      body: this.visual,
+      leftArm: this.leftArmPivot,
+      rightArm: this.rightArmPivot,
+      leftLeg: this.leftLegPivot,
+      rightLeg: this.rightLegPivot,
+    });
+
     this.scene.add(this.root);
   }
 
@@ -68,7 +87,7 @@ export class PlayerController {
 
     this.velocity.lerp(this.desiredVelocity, blend);
 
-    // PhysicsWorld will apply this desired displacement.
+    // Rotate the character toward its actual movement direction.
     if (this.velocity.lengthSq() > 0.04) {
       const targetRotation = Math.atan2(
         this.velocity.x,
@@ -84,19 +103,14 @@ export class PlayerController {
         angleDifference * (1 - Math.exp(-14 * deltaTime));
     }
 
-    if (this.velocity.lengthSq() > 0.06) {
-      this.walkTime += deltaTime * (sprinting ? 13 : 9);
+    // Update animation independently from physics movement.
+    this.animation.update(
+      deltaTime,
+      this.velocity.length(),
+      sprinting,
+    );
 
-      this.visual.position.y =
-        Math.abs(Math.sin(this.walkTime)) * 0.045;
-
-      this.visual.rotation.z =
-        Math.sin(this.walkTime * 0.5) * 0.015;
-    } else {
-      this.visual.position.y = 0;
-      this.visual.rotation.z = 0;
-    }
-
+    // Return desired displacement for Rapier.
     return new Vector3(
       this.velocity.x * deltaTime,
       0,
@@ -160,18 +174,21 @@ export class PlayerController {
       roughness: 0.88,
     });
 
+    // Torso.
     this.addPart(
       new CapsuleGeometry(0.32, 0.72, 6, 12),
       robe,
       0, 1.05, 0,
     );
 
+    // Head.
     this.addPart(
       new SphereGeometry(0.225, 16, 12),
       skin,
       0, 1.79, 0,
     );
 
+    // Hair.
     const hairCap = this.addPart(
       new SphereGeometry(0.245, 16, 10),
       hair,
@@ -180,30 +197,54 @@ export class PlayerController {
 
     hairCap.scale.set(1, 0.52, 1);
 
+    // Shoulder pivots.
+    this.leftArmPivot.position.set(-0.39, 1.43, 0);
+    this.rightArmPivot.position.set(0.39, 1.43, 0);
+
+    this.visual.add(
+      this.leftArmPivot,
+      this.rightArmPivot,
+    );
+
+    // Arms are positioned relative to their shoulder joints.
     this.addPart(
       new CapsuleGeometry(0.105, 0.48, 5, 8),
       robe,
-      -0.39, 1.12, 0,
+      0, -0.31, 0,
+      this.leftArmPivot,
     );
 
     this.addPart(
       new CapsuleGeometry(0.105, 0.48, 5, 8),
       robe,
-      0.39, 1.12, 0,
+      0, -0.31, 0,
+      this.rightArmPivot,
+    );
+
+    // Hip pivots.
+    this.leftLegPivot.position.set(-0.16, 0.65, 0);
+    this.rightLegPivot.position.set(0.16, 0.65, 0);
+
+    this.visual.add(
+      this.leftLegPivot,
+      this.rightLegPivot,
     );
 
     this.addPart(
       new CapsuleGeometry(0.13, 0.38, 5, 8),
       dark,
-      -0.16, 0.38, 0,
+      0, -0.27, 0,
+      this.leftLegPivot,
     );
 
     this.addPart(
       new CapsuleGeometry(0.13, 0.38, 5, 8),
       dark,
-      0.16, 0.38, 0,
+      0, -0.27, 0,
+      this.rightLegPivot,
     );
 
+    // Waist sash.
     const sash = this.addPart(
       new TorusGeometry(0.34, 0.055, 8, 24),
       gold,
@@ -212,6 +253,7 @@ export class PlayerController {
 
     sash.rotation.x = Math.PI / 2;
 
+    // Shoulder details.
     this.addPart(
       new SphereGeometry(0.13, 12, 10),
       gold,
@@ -231,6 +273,7 @@ export class PlayerController {
     x: number,
     y: number,
     z: number,
+    parent: Group = this.visual,
   ): Mesh {
     const mesh = new Mesh(geometry, material);
 
@@ -238,7 +281,7 @@ export class PlayerController {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
 
-    this.visual.add(mesh);
+    parent.add(mesh);
 
     return mesh;
   }

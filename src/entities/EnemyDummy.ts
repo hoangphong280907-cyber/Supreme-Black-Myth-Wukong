@@ -6,6 +6,7 @@ import {
   Material,
   Mesh,
   MeshStandardMaterial,
+  MathUtils,
   Sphere,
   SphereGeometry,
   TorusGeometry,
@@ -25,6 +26,10 @@ export class EnemyDummy {
   private readonly scene: Scene;
   private readonly root = new Group();
   private readonly healthBar = new Group();
+  private readonly leftArmPivot = new Group();
+  private readonly rightArmPivot = new Group();
+  private readonly leftLegPivot = new Group();
+  private readonly rightLegPivot = new Group();
 
   private readonly bodyMaterial = new MeshStandardMaterial({
     color: 0x71383b,
@@ -63,10 +68,14 @@ export class EnemyDummy {
     0.72,
   );
 
-  private readonly baseY: number;
+  private readonly previousPosition = new Vector3();
 
   private elapsedTime = 0;
+  private walkPhase = 0;
+  private movementBlend = 0;
   private hitFlashTimer = 0;
+  private combatPose: 'IDLE' | 'WINDUP' | 'RECOVERY' = 'IDLE';
+  private attackAnimationTimer = 0;
   private disposed = false;
 
   constructor(
@@ -76,9 +85,9 @@ export class EnemyDummy {
     z: number,
   ) {
     this.scene = scene;
-    this.baseY = y;
 
     this.root.position.set(x, y, z);
+    this.previousPosition.copy(this.root.position);
 
     this.createModel();
     this.createHealthBar();
@@ -88,6 +97,14 @@ export class EnemyDummy {
 
   get position(): Vector3 {
     return this.root.position;
+  }
+
+  setGroundHeight(surfaceHeight: number): void {
+    if (!Number.isFinite(surfaceHeight)) return;
+
+    // Match the enemy root to the sampled floor height.
+    // The original spawn root was 0.02m below the path collider top.
+    this.root.position.y = surfaceHeight - 0.02;
   }
 
   get isAlive(): boolean {
@@ -102,6 +119,37 @@ export class EnemyDummy {
     );
 
     return this.hurtbox;
+  }
+
+  faceTarget(target: Vector3, deltaTime: number): void {
+    const dx = target.x - this.root.position.x;
+    const dz = target.z - this.root.position.z;
+
+    if (dx * dx + dz * dz < 0.0001 || deltaTime <= 0) return;
+
+    const targetRotation = Math.atan2(dx, dz);
+    const difference = Math.atan2(
+      Math.sin(targetRotation - this.root.rotation.y),
+      Math.cos(targetRotation - this.root.rotation.y),
+    );
+
+    this.root.rotation.y += MathUtils.clamp(
+      difference,
+      -7.5 * deltaTime,
+      7.5 * deltaTime,
+    );
+  }
+
+  setCombatPose(pose: 'IDLE' | 'WINDUP' | 'RECOVERY'): void {
+    if (this.combatPose === pose) return;
+
+    this.combatPose = pose;
+
+    if (pose === 'RECOVERY') {
+      this.attackAnimationTimer = 0.38;
+    } else if (pose === 'IDLE') {
+      this.attackAnimationTimer = 0;
+    }
   }
 
   takeDamage(
@@ -132,12 +180,53 @@ export class EnemyDummy {
 
     this.elapsedTime += deltaTime;
 
-    // Small idle movement to make the training target visible.
-    this.root.position.y =
-      this.baseY + Math.sin(this.elapsedTime * 1.6) * 0.012;
+    // Derive locomotion from actual horizontal displacement, not AI state.
+    // This keeps the walk cycle synchronized with real movement and return motion.
+    const deltaX = this.root.position.x - this.previousPosition.x;
+    const deltaZ = this.root.position.z - this.previousPosition.z;
+    const movementSpeed = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ) / deltaTime;
+    this.previousPosition.copy(this.root.position);
+
+    const movementTarget = MathUtils.clamp(movementSpeed / 2.25, 0, 1);
+    const movementResponse = 1 - Math.exp(-12 * deltaTime);
+    this.movementBlend +=
+      (movementTarget - this.movementBlend) * movementResponse;
+
+    this.walkPhase +=
+      deltaTime * (6.5 + movementSpeed * 1.05) * this.movementBlend;
+
+    const legSwing = Math.sin(this.walkPhase) * 0.38 * this.movementBlend;
+    this.leftLegPivot.rotation.x = legSwing;
+    this.rightLegPivot.rotation.x = -legSwing;
 
     this.root.rotation.z =
       Math.sin(this.elapsedTime * 0.9) * 0.012;
+
+    this.attackAnimationTimer = Math.max(
+      0,
+      this.attackAnimationTimer - deltaTime,
+    );
+
+    const walkArmSwing = Math.sin(this.walkPhase) * 0.16 * this.movementBlend;
+    let desiredRightArm = this.combatPose === 'WINDUP' ? 0.78 : -walkArmSwing;
+    const desiredLeftArm = this.combatPose === 'WINDUP' ? -0.18 : walkArmSwing;
+
+    if (this.attackAnimationTimer > 0) {
+      const progress = 1 - this.attackAnimationTimer / 0.38;
+      if (progress < 0.32) {
+        const swing = progress / 0.32;
+        desiredRightArm = 0.78 + (-1.25 - 0.78) * swing;
+      } else {
+        const recovery = (progress - 0.32) / 0.68;
+        desiredRightArm = -1.25 * (1 - recovery);
+      }
+    }
+
+    const armBlend = 1 - Math.exp(-20 * deltaTime);
+    this.rightArmPivot.rotation.x +=
+      (desiredRightArm - this.rightArmPivot.rotation.x) * armBlend;
+    this.leftArmPivot.rotation.x +=
+      (desiredLeftArm - this.leftArmPivot.rotation.x) * armBlend;
 
     this.hitFlashTimer = Math.max(
       0,
@@ -148,14 +237,19 @@ export class EnemyDummy {
       this.hitFlashTimer > 0
         ? 0.8 * (this.hitFlashTimer / 0.14)
         : 0;
+    const telegraphIntensity =
+      this.combatPose === 'WINDUP'
+        ? 0.32 + Math.sin(this.elapsedTime * 18) * 0.12
+        : 0;
+    const emissiveIntensity = Math.max(flashIntensity, telegraphIntensity);
 
     this.bodyMaterial.emissive.setRGB(
-      flashIntensity,
+      emissiveIntensity,
       flashIntensity * 0.8,
       flashIntensity * 0.8,
     );
 
-    this.bodyMaterial.emissiveIntensity = flashIntensity;
+    this.bodyMaterial.emissiveIntensity = emissiveIntensity;
   }
 
   dispose(): void {
@@ -212,34 +306,44 @@ export class EnemyDummy {
       0, 1.94, 0,
     ).scale.set(1, 0.48, 1);
 
-    // Arms.
+    // Arms are pivoted so the enemy can telegraph and perform a melee strike.
+    this.leftArmPivot.position.set(-0.43, 1.38, 0);
+    this.rightArmPivot.position.set(0.43, 1.38, 0);
+    this.root.add(this.leftArmPivot, this.rightArmPivot);
+
     const leftArm = this.addPart(
       new CapsuleGeometry(0.105, 0.42, 5, 8),
       this.bodyMaterial,
-      -0.43, 1.12, 0,
+      0, -0.26, 0,
+      this.leftArmPivot,
     );
-
-    leftArm.rotation.z = -0.22;
+    leftArm.rotation.z = -0.08;
 
     const rightArm = this.addPart(
       new CapsuleGeometry(0.105, 0.42, 5, 8),
       this.bodyMaterial,
-      0.43, 1.12, 0,
+      0, -0.26, 0,
+      this.rightArmPivot,
     );
+    rightArm.rotation.z = 0.08;
 
-    rightArm.rotation.z = 0.22;
-
-    // Legs.
-    this.addPart(
-      new CapsuleGeometry(0.13, 0.42, 5, 8),
-      this.darkMaterial,
-      -0.16, 0.37, 0,
-    );
+    // Legs use pivots so locomotion can drive a visible alternating gait.
+    this.leftLegPivot.position.set(-0.16, 0.65, 0);
+    this.rightLegPivot.position.set(0.16, 0.65, 0);
+    this.root.add(this.leftLegPivot, this.rightLegPivot);
 
     this.addPart(
-      new CapsuleGeometry(0.13, 0.42, 5, 8),
+      new CapsuleGeometry(0.13, 0.38, 5, 8),
       this.darkMaterial,
-      0.16, 0.37, 0,
+      0, -0.27, 0,
+      this.leftLegPivot,
+    );
+
+    this.addPart(
+      new CapsuleGeometry(0.13, 0.38, 5, 8),
+      this.darkMaterial,
+      0, -0.27, 0,
+      this.rightLegPivot,
     );
 
     // Waist ornament.
@@ -306,6 +410,7 @@ export class EnemyDummy {
     x: number,
     y: number,
     z: number,
+    parent: Group = this.root,
   ): Mesh {
     const mesh = new Mesh(geometry, material);
 
@@ -313,7 +418,7 @@ export class EnemyDummy {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
 
-    this.root.add(mesh);
+    parent.add(mesh);
 
     return mesh;
   }

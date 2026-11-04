@@ -135,6 +135,57 @@ export class PhysicsWorld {
     this.trainingDummyCollider = null;
   }
 
+  getGroundHeight(position: Vector3): number | null {
+    if (this.disposed) return null;
+
+    const ray = new this.rapier.Ray(
+      { x: position.x, y: position.y + 3, z: position.z },
+      { x: 0, y: -1, z: 0 },
+    );
+
+    const ignoredColliders = new Set<Collider>([this.playerCollider]);
+    if (this.trainingDummyCollider) {
+      ignoredColliders.add(this.trainingDummyCollider);
+    }
+
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const hit = this.world.castRayAndGetNormal(
+        ray,
+        8,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        (collider) => !ignoredColliders.has(collider),
+      );
+
+      if (hit === null) return null;
+
+      ignoredColliders.add(hit.collider);
+
+      // Ignore walls and steep sides; only accept walkable upward-facing surfaces.
+      if (hit.normal.y >= 0.65) {
+        return ray.origin.y - hit.timeOfImpact;
+      }
+    }
+
+    return null;
+  }
+
+  syncTrainingDummyPosition(position: Vector3): void {
+    if (this.disposed || this.trainingDummyCollider === null) return;
+
+    this.trainingDummyCollider.setTranslation({
+      x: position.x,
+      y: position.y + 0.97,
+      z: position.z,
+    });
+
+    // Refresh Rapier's broad-phase so the character controller sees the moved enemy collider.
+    this.world.step();
+  }
+
   moveCharacter(
     currentRootPosition: Vector3,
     desiredMovement: Vector3,

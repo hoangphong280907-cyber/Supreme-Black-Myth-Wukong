@@ -3,6 +3,7 @@ import { InputManager } from '../input/InputManager';
 import { PlayerController } from '../entities/PlayerController';
 import { EnemyDummy } from '../entities/EnemyDummy';
 import { MeleeCombatSystem, type AttackResolution } from '../combat/MeleeCombatSystem';
+import { EnemyAIController } from '../ai/EnemyAIController';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
 import { GameRenderer } from '../renderer/GameRenderer';
 import { WorldScene } from '../scenes/WorldScene';
@@ -16,12 +17,15 @@ export class Game {
   private readonly player: PlayerController;
   private readonly enemyDummy: EnemyDummy;
   private readonly combat: MeleeCombatSystem;
+  private readonly enemyAI: EnemyAIController;
 
   private readonly dodgeCooldownFill: HTMLElement | null;
   private readonly dodgeCooldownLabel: HTMLElement | null;
   private readonly attackCooldownFill: HTMLElement | null;
   private readonly attackCooldownLabel: HTMLElement | null;
   private readonly combatFeedbackLabel: HTMLElement | null;
+  private readonly playerHealthFill: HTMLElement | null;
+  private readonly playerHealthLabel: HTMLElement | null;
 
   private combatFeedbackTimer = 0;
 
@@ -55,6 +59,10 @@ export class Game {
       this.player,
       this.enemyDummy,
     );
+    this.enemyAI = new EnemyAIController(
+      this.enemyDummy,
+      this.player,
+    );
 
     const appRoot = viewport.parentElement;
 
@@ -72,6 +80,10 @@ export class Game {
 
     this.combatFeedbackLabel =
       appRoot?.querySelector<HTMLElement>('#combat-feedback') ?? null;
+    this.playerHealthFill =
+      appRoot?.querySelector<HTMLElement>('#player-health-fill') ?? null;
+    this.playerHealthLabel =
+      appRoot?.querySelector<HTMLElement>('#player-health-label') ?? null;
 
     window.addEventListener('resize', this.handleResize);
     this.handleResize();
@@ -182,11 +194,25 @@ export class Game {
     }
   }
 
-  private showCombatFeedback(result: AttackResolution): void {
+  private showCombatFeedback(result: AttackResolution | string): void {
     if (!this.combatFeedbackLabel) return;
 
     this.combatFeedbackLabel.textContent = result;
     this.combatFeedbackTimer = 0.9;
+  }
+
+  private updatePlayerHealthHud(): void {
+    const health = this.player.health;
+
+    if (this.playerHealthFill) {
+      this.playerHealthFill.style.transform = `scaleX(${health.healthRatio})`;
+    }
+
+    if (this.playerHealthLabel) {
+      this.playerHealthLabel.textContent = health.isDead
+        ? 'DEFEATED'
+        : `${Math.ceil(health.currentHealth)} / ${health.maxHealth}`;
+    }
   }
 
   private readonly handleResize = (): void => {
@@ -239,6 +265,24 @@ export class Game {
     );
 
     if (deltaTime > 0) {
+      const enemyAttack = this.enemyAI.update(deltaTime);
+      if (enemyAttack === 'HIT') {
+        this.showCombatFeedback('ENEMY HIT');
+      } else if (enemyAttack === 'BLOCKED') {
+        this.showCombatFeedback('DODGED');
+      } else if (enemyAttack === 'MISS') {
+        this.showCombatFeedback('ENEMY MISS');
+      }
+
+      this.enemyDummy.update(deltaTime);
+
+      const groundHeight = physics.getGroundHeight(this.enemyDummy.position);
+      if (groundHeight !== null) {
+        this.enemyDummy.setGroundHeight(groundHeight);
+      }
+
+      physics.syncTrainingDummyPosition(this.enemyDummy.position);
+
       const jumpRequested = this.input.consumeJumpRequest();
 
       const correctedPosition = physics.moveCharacter(
@@ -270,6 +314,7 @@ export class Game {
 
     this.updateDodgeHud();
     this.updateAttackHud(deltaTime);
+    this.updatePlayerHealthHud();
 
     this.camera.update(
       this.player.position,
@@ -277,7 +322,6 @@ export class Game {
     );
 
     this.world.update(this.elapsedTime);
-    this.enemyDummy.update(deltaTime);
 
     this.renderer.render(
       this.world.scene,

@@ -64,6 +64,15 @@ app.innerHTML = `
         <span id="combat-feedback">LMB TO ATTACK</span>
       </div>
     </div>
+    <div class="player-health-hud" id="player-health-hud">
+      <div class="player-health-row">
+        <span class="player-health-title">VITALITY</span>
+        <span id="player-health-label">100 / 100</span>
+      </div>
+      <div class="player-health-track">
+        <span id="player-health-fill"></span>
+      </div>
+    </div>
     <span class="bottom-mark">THE PATH TO THE WEST</span>
     <span class="bottom-note">COMBAT FOUNDATION · BUILD 0008</span>
   </footer>

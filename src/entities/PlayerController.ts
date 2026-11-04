@@ -15,6 +15,7 @@ import {
 import type { Scene } from 'three';
 
 import { CharacterAnimationController } from '../animation/CharacterAnimationController';
+import { HealthComponent, type DamageResult } from '../combat/HealthComponent';
 
 const WALK_SPEED = 4.2;
 const RUN_SPEED = 6.2;
@@ -37,6 +38,8 @@ const ATTACK_HIT_TIME = 0.15;
 const ATTACK_COOLDOWN = 0.62;
 
 export class PlayerController {
+  readonly health = new HealthComponent(100);
+
   private readonly scene: Scene;
 
   private readonly root = new Group();
@@ -115,6 +118,14 @@ export class PlayerController {
     return this.root.position;
   }
 
+  get isAlive(): boolean {
+    return !this.health.isDead;
+  }
+
+  takeDamage(amount: number): DamageResult {
+    return this.health.applyDamage(amount, this.isInvulnerable);
+  }
+
   setPosition(position: Vector3): void {
     this.root.position.copy(position);
   }
@@ -153,6 +164,7 @@ export class PlayerController {
 
   tryStartAttack(grounded: boolean): boolean {
     if (
+      !this.isAlive ||
       !grounded ||
       this.dodging ||
       this.attacking ||
@@ -193,6 +205,7 @@ export class PlayerController {
     grounded: boolean,
   ): boolean {
     if (
+      !this.isAlive ||
       !grounded ||
       this.dodging ||
       this.attacking ||
@@ -245,6 +258,14 @@ export class PlayerController {
     sprinting: boolean,
   ): Vector3 {
     if (deltaTime <= 0) {
+      return new Vector3();
+    }
+
+    if (!this.isAlive) {
+      this.velocity.set(0, 0, 0);
+      this.previousSpeed = 0;
+      this.attacking = false;
+      this.dodging = false;
       return new Vector3();
     }
 

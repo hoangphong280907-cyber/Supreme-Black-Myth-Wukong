@@ -396,3 +396,49 @@ body {
   min-height: 10px;
   color: rgba(229, 223, 209, 0.64);
 }
+
+
+/* Player vitality HUD */
+.player-health-hud {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  width: min(190px, 24vw);
+  min-width: 150px;
+  padding: 10px 14px;
+  border: 1px solid rgba(216, 183, 124, 0.22);
+  background: rgba(8, 12, 18, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.player-health-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(229, 223, 209, 0.72);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+
+.player-health-title {
+  color: rgba(229, 223, 209, 0.55);
+}
+
+.player-health-track {
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+#player-health-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #c96b66;
+  box-shadow: 0 0 8px rgba(201, 107, 102, 0.55);
+  transform: scaleX(1);
+  transform-origin: left center;
+}

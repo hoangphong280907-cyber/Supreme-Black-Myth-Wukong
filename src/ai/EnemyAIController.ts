@@ -21,9 +21,9 @@ const ATTACK_RANGE = 1.5;
 const ATTACK_CANCEL_RANGE = 1.95;
 const STRIKE_RANGE = 1.72;
 const STOP_DISTANCE = 1.08;
-const ATTACK_WINDUP = 0.68;
-const ATTACK_RECOVERY = 1.05;
-const ATTACK_DAMAGE = 12;
+const ATTACK_WINDUP = 0.82;
+const ATTACK_RECOVERY = 1.35;
+const ATTACK_DAMAGE = 10;
 
 export class EnemyAIController {
   private readonly enemy: EnemyDummy;
@@ -114,7 +114,10 @@ export class EnemyAIController {
             return 'MISS';
           }
 
-          const damage = this.player.takeDamage(ATTACK_DAMAGE);
+          const damage = this.player.takeDamage(
+            ATTACK_DAMAGE,
+            this.enemy.position,
+          );
           if (damage.blockedByInvulnerability) return 'BLOCKED';
           return damage.appliedDamage > 0 ? 'HIT' : 'MISS';
         }

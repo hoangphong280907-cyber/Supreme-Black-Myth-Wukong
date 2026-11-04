@@ -36,6 +36,9 @@ const INVULNERABILITY_DURATION = 0.16;
 const ATTACK_DURATION = 0.42;
 const ATTACK_HIT_TIME = 0.15;
 const ATTACK_COOLDOWN = 0.62;
+const RESPAWN_INVULNERABILITY_DURATION = 2.25;
+const HIT_KNOCKBACK_SPEED = 3.2;
+const HIT_FLASH_DURATION = 0.28;
 
 export class PlayerController {
   readonly health = new HealthComponent(100);
@@ -76,6 +79,10 @@ export class PlayerController {
   });
 
   private readonly dodgeTrailMeshes: Mesh[] = [];
+  private readonly spawnPosition = new Vector3();
+  private readonly hitDirection = new Vector3();
+  private readonly hitFlashMaterials: MeshStandardMaterial[] = [];
+  private hitFlashTimer = 0;
 
   private dodging = false;
   private dodgeElapsed = 0;
@@ -95,6 +102,7 @@ export class PlayerController {
       0.16,
       9.6,
     );
+    this.spawnPosition.copy(this.root.position);
 
     this.root.rotation.y = Math.PI;
 
@@ -122,8 +130,69 @@ export class PlayerController {
     return !this.health.isDead;
   }
 
-  takeDamage(amount: number): DamageResult {
-    return this.health.applyDamage(amount, this.isInvulnerable);
+  takeDamage(amount: number, sourcePosition?: Vector3): DamageResult {
+    const result = this.health.applyDamage(amount, this.isInvulnerable);
+
+    if (result.appliedDamage > 0) {
+      this.hitFlashTimer = HIT_FLASH_DURATION;
+
+      if (sourcePosition) {
+        this.hitDirection.set(
+          this.root.position.x - sourcePosition.x,
+          0,
+          this.root.position.z - sourcePosition.z,
+        );
+
+        if (this.hitDirection.lengthSq() > 0.0001) {
+          this.hitDirection.normalize();
+          this.velocity.addScaledVector(this.hitDirection, HIT_KNOCKBACK_SPEED);
+        }
+      }
+
+      if (result.isDead) {
+        this.root.visible = false;
+        this.attacking = false;
+        this.dodging = false;
+      }
+    }
+
+    return result;
+  }
+
+  respawn(): void {
+    this.health.restoreToFull();
+    this.root.position.copy(this.spawnPosition);
+    this.root.visible = true;
+    this.root.rotation.set(0, Math.PI, 0);
+    this.leanPivot.rotation.set(0, 0, 0);
+    this.visual.position.set(0, 0, 0);
+    this.visual.rotation.set(0, 0, 0);
+
+    this.velocity.set(0, 0, 0);
+    this.desiredVelocity.set(0, 0, 0);
+    this.previousSpeed = 0;
+    this.forwardLean = 0;
+    this.turnLean = 0;
+
+    this.dodging = false;
+    this.dodgeElapsed = 0;
+    this.dodgeCooldownTimer = 0;
+    this.invulnerabilityTimer = RESPAWN_INVULNERABILITY_DURATION;
+    this.attacking = false;
+    this.attackElapsed = 0;
+    this.attackCooldownTimer = 0;
+    this.attackImpactPending = false;
+    this.hitFlashTimer = 0;
+
+    for (const trail of this.dodgeTrailMeshes) {
+      trail.visible = false;
+    }
+    this.dodgeTrailMaterial.opacity = 0;
+
+    for (const material of this.hitFlashMaterials) {
+      material.emissive.setRGB(0, 0, 0);
+      material.emissiveIntensity = 0;
+    }
   }
 
   setPosition(position: Vector3): void {
@@ -284,6 +353,19 @@ export class PlayerController {
       this.attackCooldownTimer - deltaTime,
     );
 
+    this.hitFlashTimer = Math.max(0, this.hitFlashTimer - deltaTime);
+    const hitFlashIntensity = this.hitFlashTimer > 0
+      ? 1.15 * (this.hitFlashTimer / HIT_FLASH_DURATION)
+      : 0;
+    for (const material of this.hitFlashMaterials) {
+      material.emissive.setRGB(
+        hitFlashIntensity,
+        hitFlashIntensity * 0.28,
+        hitFlashIntensity * 0.22,
+      );
+      material.emissiveIntensity = hitFlashIntensity;
+    }
+
     if (this.attacking) {
       const previousAttackElapsed = this.attackElapsed;
 
@@ -370,6 +452,7 @@ export class PlayerController {
       landed,
       this.dodging,
       this.attacking,
+      this.hitFlashTimer > 0,
     );
   }
 
@@ -544,6 +627,8 @@ export class PlayerController {
       color: 0x1c222c,
       roughness: 0.88,
     });
+
+    this.hitFlashMaterials.push(robe, skin, hair, gold, dark);
 
     this.addPart(
       new CapsuleGeometry(0.32, 0.72, 6, 12),

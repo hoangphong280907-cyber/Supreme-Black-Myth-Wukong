@@ -26,8 +26,12 @@ export class Game {
   private readonly combatFeedbackLabel: HTMLElement | null;
   private readonly playerHealthFill: HTMLElement | null;
   private readonly playerHealthLabel: HTMLElement | null;
+  private readonly deathOverlay: HTMLElement | null;
+  private readonly respawnCountdownLabel: HTMLElement | null;
 
   private combatFeedbackTimer = 0;
+  private respawnTimer = 0;
+  private deathSequenceActive = false;
 
   private physics: PhysicsWorld | null = null;
 
@@ -84,6 +88,10 @@ export class Game {
       appRoot?.querySelector<HTMLElement>('#player-health-fill') ?? null;
     this.playerHealthLabel =
       appRoot?.querySelector<HTMLElement>('#player-health-label') ?? null;
+    this.deathOverlay =
+      appRoot?.querySelector<HTMLElement>('#death-overlay') ?? null;
+    this.respawnCountdownLabel =
+      appRoot?.querySelector<HTMLElement>('#respawn-countdown') ?? null;
 
     window.addEventListener('resize', this.handleResize);
     this.handleResize();
@@ -208,10 +216,40 @@ export class Game {
       this.playerHealthFill.style.transform = `scaleX(${health.healthRatio})`;
     }
 
+    if (this.playerHealthFill) {
+      this.playerHealthFill.classList.toggle('mid-health', health.healthRatio <= 0.6 && health.healthRatio > 0.3);
+      this.playerHealthFill.classList.toggle('low-health', health.healthRatio <= 0.3);
+    }
+
     if (this.playerHealthLabel) {
       this.playerHealthLabel.textContent = health.isDead
         ? 'DEFEATED'
         : `${Math.ceil(health.currentHealth)} / ${health.maxHealth}`;
+    }
+  }
+
+  private updateDeathSequence(deltaTime: number, physics: PhysicsWorld): void {
+    if (this.player.isAlive) return;
+
+    if (!this.deathSequenceActive) {
+      this.deathSequenceActive = true;
+      this.respawnTimer = 3;
+      if (this.deathOverlay) this.deathOverlay.hidden = false;
+    }
+
+    this.respawnTimer = Math.max(0, this.respawnTimer - deltaTime);
+
+    if (this.respawnCountdownLabel) {
+      this.respawnCountdownLabel.textContent = `${Math.max(1, Math.ceil(this.respawnTimer))}`;
+    }
+
+    if (this.respawnTimer <= 0) {
+      this.player.respawn();
+      physics.teleportPlayer(this.player.position);
+      this.deathSequenceActive = false;
+      this.respawnTimer = 0;
+      if (this.deathOverlay) this.deathOverlay.hidden = true;
+      this.showCombatFeedback('REVIVED');
     }
   }
 
@@ -274,6 +312,7 @@ export class Game {
         this.showCombatFeedback('ENEMY MISS');
       }
 
+      this.updateDeathSequence(deltaTime, physics);
       this.enemyDummy.update(deltaTime);
 
       const groundHeight = physics.getGroundHeight(this.enemyDummy.position);

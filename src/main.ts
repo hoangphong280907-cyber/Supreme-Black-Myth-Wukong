@@ -33,6 +33,14 @@ app.innerHTML = `
     </div>
   </header>
 
+  <section class="death-overlay" id="death-overlay" hidden aria-live="assertive">
+    <div class="death-panel">
+      <span class="death-kicker">THE JOURNEY IS NOT OVER</span>
+      <h2>YOU HAVE FALLEN</h2>
+      <p>Returning to the path in <strong id="respawn-countdown">3</strong></p>
+    </div>
+  </section>
+
   <footer class="hud hud-bottom">
     <div class="dodge-hud" id="dodge-hud">
       <span class="dodge-key">Q</span>

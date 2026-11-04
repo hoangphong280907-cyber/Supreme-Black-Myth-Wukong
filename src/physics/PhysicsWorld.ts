@@ -119,6 +119,25 @@ export class PhysicsWorld {
     return landed;
   }
 
+  teleportPlayer(position: Vector3): void {
+    if (this.disposed) return;
+
+    this.playerCollider.setTranslation({
+      x: position.x,
+      y: position.y + CAPSULE_CENTER_OFFSET,
+      z: position.z,
+    });
+
+    this.verticalVelocity = 0;
+    this.jumpBufferTimer = 0;
+    this.coyoteTimer = 0;
+    this.isGrounded = false;
+    this.hasInitializedGroundState = false;
+    this.landedThisFrame = false;
+
+    this.world.step();
+  }
+
   removeTrainingDummyCollider(): void {
     if (
       this.disposed ||

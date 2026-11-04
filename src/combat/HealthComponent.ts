@@ -66,6 +66,10 @@ export class HealthComponent {
     };
   }
 
+  restoreToFull(): void {
+    this.health = this.maxHealth;
+  }
+
   heal(amount: number): number {
     if (this.isDead || !Number.isFinite(amount) || amount <= 0) {
       return 0;

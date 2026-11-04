@@ -23,6 +23,7 @@ export class CharacterAnimationController {
   private landingImpact = 0;
   private dodgeBlend = 0;
   private attackBlend = 0;
+  private hitBlend = 0;
 
   constructor(rig: CharacterRig) {
     this.rig = rig;
@@ -36,6 +37,7 @@ export class CharacterAnimationController {
     landed: boolean,
     dodging: boolean,
     attacking: boolean,
+    hitReacting = false,
   ): void {
     if (deltaTime <= 0) return;
 
@@ -97,6 +99,13 @@ export class CharacterAnimationController {
       deltaTime,
     );
 
+    this.hitBlend = this.smoothBlend(
+      this.hitBlend,
+      hitReacting ? 1 : 0,
+      28,
+      deltaTime,
+    );
+
     // Movement animation follows actual velocity.
     const cadence = 6.5 + movementSpeed * 1.05;
 
@@ -134,15 +143,17 @@ export class CharacterAnimationController {
       -step * armAmplitude * this.movementBlend -
       risingBlend * 0.45 +
       fallingBlend * 0.22 -
-      this.dodgeBlend * 0.72 -
-      this.attackBlend * 0.22;
+      -this.dodgeBlend * 0.72 -
+      this.attackBlend * 0.22 -
+      this.hitBlend * 0.48;
 
     this.rig.rightArm.rotation.x =
       step * armAmplitude * this.movementBlend -
       risingBlend * 0.45 +
       fallingBlend * 0.22 -
-      this.dodgeBlend * 0.72 -
-      this.attackBlend * 1.42;
+      -this.dodgeBlend * 0.72 -
+      this.attackBlend * 1.42 -
+      this.hitBlend * 0.68;
 
     this.rig.leftArm.rotation.z =
       -this.airborneBlend * 0.1 -
@@ -178,7 +189,8 @@ export class CharacterAnimationController {
       fallingBlend * 0.12 +
       this.landingImpact * 0.1 +
       this.dodgeBlend * 0.22 -
-      this.attackBlend * 0.06;
+      this.attackBlend * 0.06 +
+      this.hitBlend * 0.16;
 
     this.rig.body.rotation.z =
       step * 0.018 * this.movementBlend +

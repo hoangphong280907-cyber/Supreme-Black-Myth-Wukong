@@ -32,6 +32,10 @@ const DODGE_DISTANCE = 2.1;
 const DODGE_COOLDOWN = 0.85;
 const INVULNERABILITY_DURATION = 0.16;
 
+const ATTACK_DURATION = 0.42;
+const ATTACK_HIT_TIME = 0.15;
+const ATTACK_COOLDOWN = 0.62;
+
 export class PlayerController {
   private readonly scene: Scene;
 
@@ -74,6 +78,11 @@ export class PlayerController {
   private dodgeElapsed = 0;
   private dodgeCooldownTimer = 0;
   private invulnerabilityTimer = 0;
+
+  private attacking = false;
+  private attackElapsed = 0;
+  private attackCooldownTimer = 0;
+  private attackImpactPending = false;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -118,6 +127,55 @@ export class PlayerController {
     return this.invulnerabilityTimer > 0;
   }
 
+  get isAttacking(): boolean {
+    return this.attacking;
+  }
+
+  get attackCooldownRemaining(): number {
+    return this.attackCooldownTimer;
+  }
+
+  get attackCooldownProgress(): number {
+    return MathUtils.clamp(
+      1 - this.attackCooldownTimer / ATTACK_COOLDOWN,
+      0,
+      1,
+    );
+  }
+
+  get forwardDirection(): Vector3 {
+    return new Vector3(
+      Math.sin(this.root.rotation.y),
+      0,
+      Math.cos(this.root.rotation.y),
+    );
+  }
+
+  tryStartAttack(grounded: boolean): boolean {
+    if (
+      !grounded ||
+      this.dodging ||
+      this.attacking ||
+      this.attackCooldownTimer > 0
+    ) {
+      return false;
+    }
+
+    this.attacking = true;
+    this.attackElapsed = 0;
+    this.attackCooldownTimer = ATTACK_COOLDOWN;
+    this.attackImpactPending = false;
+
+    return true;
+  }
+
+  consumeAttackImpact(): boolean {
+    const pending = this.attackImpactPending;
+    this.attackImpactPending = false;
+
+    return pending;
+  }
+
   get dodgeCooldownRemaining(): number {
     return this.dodgeCooldownTimer;
   }
@@ -137,6 +195,7 @@ export class PlayerController {
     if (
       !grounded ||
       this.dodging ||
+      this.attacking ||
       this.dodgeCooldownTimer > 0
     ) {
       return false;
@@ -199,6 +258,31 @@ export class PlayerController {
       this.invulnerabilityTimer - deltaTime,
     );
 
+    this.attackCooldownTimer = Math.max(
+      0,
+      this.attackCooldownTimer - deltaTime,
+    );
+
+    if (this.attacking) {
+      const previousAttackElapsed = this.attackElapsed;
+
+      this.attackElapsed = Math.min(
+        ATTACK_DURATION,
+        this.attackElapsed + deltaTime,
+      );
+
+      if (
+        previousAttackElapsed < ATTACK_HIT_TIME &&
+        this.attackElapsed >= ATTACK_HIT_TIME
+      ) {
+        this.attackImpactPending = true;
+      }
+
+      if (this.attackElapsed >= ATTACK_DURATION) {
+        this.attacking = false;
+      }
+    }
+
     if (this.dodging) {
       return this.updateDodge(deltaTime);
     }
@@ -239,7 +323,7 @@ export class PlayerController {
 
     const currentSpeed = this.velocity.length();
 
-    this.updateFacing(deltaTime);
+    if (!this.attacking) this.updateFacing(deltaTime);
     this.updateMovementLean(deltaTime, currentSpeed);
 
     this.previousSpeed = currentSpeed;
@@ -264,6 +348,7 @@ export class PlayerController {
       grounded,
       landed,
       this.dodging,
+      this.attacking,
     );
   }
 

@@ -2,6 +2,7 @@ import { CameraManager } from '../camera/CameraManager';
 import { InputManager } from '../input/InputManager';
 import { PlayerController } from '../entities/PlayerController';
 import { EnemyDummy } from '../entities/EnemyDummy';
+import { MeleeCombatSystem, type AttackResolution } from '../combat/MeleeCombatSystem';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
 import { GameRenderer } from '../renderer/GameRenderer';
 import { WorldScene } from '../scenes/WorldScene';
@@ -14,9 +15,15 @@ export class Game {
   private readonly input: InputManager;
   private readonly player: PlayerController;
   private readonly enemyDummy: EnemyDummy;
+  private readonly combat: MeleeCombatSystem;
 
   private readonly dodgeCooldownFill: HTMLElement | null;
   private readonly dodgeCooldownLabel: HTMLElement | null;
+  private readonly attackCooldownFill: HTMLElement | null;
+  private readonly attackCooldownLabel: HTMLElement | null;
+  private readonly combatFeedbackLabel: HTMLElement | null;
+
+  private combatFeedbackTimer = 0;
 
   private physics: PhysicsWorld | null = null;
 
@@ -44,6 +51,11 @@ export class Game {
       7.9,
     );
 
+    this.combat = new MeleeCombatSystem(
+      this.player,
+      this.enemyDummy,
+    );
+
     const appRoot = viewport.parentElement;
 
     this.dodgeCooldownFill =
@@ -51,6 +63,15 @@ export class Game {
 
     this.dodgeCooldownLabel =
       appRoot?.querySelector<HTMLElement>('#dodge-cooldown-label') ?? null;
+
+    this.attackCooldownFill =
+      appRoot?.querySelector<HTMLElement>('#attack-cooldown-fill') ?? null;
+
+    this.attackCooldownLabel =
+      appRoot?.querySelector<HTMLElement>('#attack-cooldown-label') ?? null;
+
+    this.combatFeedbackLabel =
+      appRoot?.querySelector<HTMLElement>('#combat-feedback') ?? null;
 
     window.addEventListener('resize', this.handleResize);
     this.handleResize();
@@ -129,6 +150,45 @@ export class Game {
     }
   }
 
+  private updateAttackHud(deltaTime: number): void {
+    if (this.attackCooldownFill) {
+      this.attackCooldownFill.style.transform =
+        `scaleX(${this.player.attackCooldownProgress})`;
+    }
+
+    if (this.attackCooldownLabel) {
+      if (this.player.isAttacking) {
+        this.attackCooldownLabel.textContent = 'STRIKE';
+      } else if (this.player.attackCooldownRemaining > 0) {
+        this.attackCooldownLabel.textContent =
+          `${this.player.attackCooldownRemaining.toFixed(1)}s`;
+      } else {
+        this.attackCooldownLabel.textContent = 'READY';
+      }
+    }
+
+    if (this.combatFeedbackTimer > 0) {
+      this.combatFeedbackTimer = Math.max(
+        0,
+        this.combatFeedbackTimer - deltaTime,
+      );
+
+      if (
+        this.combatFeedbackTimer === 0 &&
+        this.combatFeedbackLabel
+      ) {
+        this.combatFeedbackLabel.textContent = 'LMB TO ATTACK';
+      }
+    }
+  }
+
+  private showCombatFeedback(result: AttackResolution): void {
+    if (!this.combatFeedbackLabel) return;
+
+    this.combatFeedbackLabel.textContent = result;
+    this.combatFeedbackTimer = 0.9;
+  }
+
   private readonly handleResize = (): void => {
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -168,6 +228,10 @@ export class Game {
       );
     }
 
+    if (this.input.consumeAttackRequest()) {
+      this.combat.tryStartAttack(physics.grounded);
+    }
+
     const desiredMovement = this.player.update(
       deltaTime,
       movementDirection,
@@ -186,6 +250,16 @@ export class Game {
 
       this.player.setPosition(correctedPosition);
 
+      const attackResolution = this.combat.update();
+
+      if (attackResolution) {
+        this.showCombatFeedback(attackResolution);
+
+        if (attackResolution === 'DEFEATED') {
+          physics.removeTrainingDummyCollider();
+        }
+      }
+
       this.player.updateAnimationState(
         deltaTime,
         physics.grounded,
@@ -195,6 +269,7 @@ export class Game {
     }
 
     this.updateDodgeHud();
+    this.updateAttackHud(deltaTime);
 
     this.camera.update(
       this.player.position,

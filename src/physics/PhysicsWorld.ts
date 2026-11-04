@@ -27,6 +27,7 @@ export class PhysicsWorld {
 
   private readonly playerCollider: Collider;
   private readonly characterController: KinematicCharacterController;
+  private trainingDummyCollider: Collider | null = null;
 
   private verticalVelocity = 0;
   private jumpBufferTimer = 0;
@@ -116,6 +117,22 @@ export class PhysicsWorld {
     this.landedThisFrame = false;
 
     return landed;
+  }
+
+  removeTrainingDummyCollider(): void {
+    if (
+      this.disposed ||
+      this.trainingDummyCollider === null
+    ) {
+      return;
+    }
+
+    this.world.removeCollider(
+      this.trainingDummyCollider,
+      true,
+    );
+
+    this.trainingDummyCollider = null;
   }
 
   moveCharacter(
@@ -279,7 +296,8 @@ export class PhysicsWorld {
       )
       .setFriction(0);
 
-    this.world.createCollider(enemyCollider);
+    this.trainingDummyCollider = this.world.createCollider(enemyCollider);
+
     // Pillars and their stone bases.
     for (const x of [-3, 3]) {
       this.addStaticBox(

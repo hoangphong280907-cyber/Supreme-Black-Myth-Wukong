@@ -17,6 +17,7 @@ export class InputManager {
 
   private jumpRequested = false;
   private dodgeRequested = false;
+  private attackRequested = false;
 
   private readonly movementKeys = new Set([
     'KeyW',
@@ -72,6 +73,13 @@ export class InputManager {
     return requested;
   }
 
+  consumeAttackRequest(): boolean {
+    const requested = this.attackRequested;
+    this.attackRequested = false;
+
+    return requested;
+  }
+
   consumeJumpRequest(): boolean {
     const requested = this.jumpRequested;
     this.jumpRequested = false;
@@ -115,6 +123,7 @@ export class InputManager {
     this.activePointerId = null;
     this.jumpRequested = false;
     this.dodgeRequested = false;
+    this.attackRequested = false;
   }
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
@@ -153,9 +162,19 @@ export class InputManager {
     this.activePointerId = null;
     this.jumpRequested = false;
     this.dodgeRequested = false;
+    this.attackRequested = false;
   };
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
+    const isLeftMouseButton =
+      event.pointerType === 'mouse' && event.button === 0;
+
+    if (isLeftMouseButton) {
+      event.preventDefault();
+      this.attackRequested = true;
+      return;
+    }
+
     const isTouch = event.pointerType === 'touch';
     const isRightMouseButton =
       event.pointerType === 'mouse' && event.button === 2;

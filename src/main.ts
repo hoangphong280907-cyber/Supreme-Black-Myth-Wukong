@@ -48,8 +48,24 @@ app.innerHTML = `
         </div>
       </div>
     </div>
+    <div class="attack-hud" id="attack-hud">
+      <span class="attack-key">LMB</span>
+
+      <div class="attack-details">
+        <div class="attack-row">
+          <span class="attack-title">MELEE</span>
+          <span id="attack-cooldown-label">READY</span>
+        </div>
+
+        <div class="attack-cooldown-track">
+          <span id="attack-cooldown-fill"></span>
+        </div>
+
+        <span id="combat-feedback">LMB TO ATTACK</span>
+      </div>
+    </div>
     <span class="bottom-mark">THE PATH TO THE WEST</span>
-    <span class="bottom-note">EARLY ENGINE PROTOTYPE · BUILD 0006</span>
+    <span class="bottom-note">COMBAT FOUNDATION · BUILD 0008</span>
   </footer>
 `;
 

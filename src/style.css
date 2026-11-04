@@ -318,3 +318,81 @@ body {
   transform: scaleX(1);
   transform-origin: left center;
 }
+
+ /* Melee combat HUD */
+.attack-hud {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 194px;
+  padding: 10px 14px;
+  border: 1px solid rgba(216, 183, 124, 0.22);
+  background: rgba(8, 12, 18, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.attack-key {
+  display: grid;
+  place-items: center;
+  min-width: 42px;
+  height: 34px;
+  padding: 0 6px;
+  border: 1px solid rgba(216, 183, 124, 0.55);
+  color: #e5c98f;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.attack-details {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 118px;
+}
+
+.attack-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.attack-title,
+#attack-cooldown-label,
+#combat-feedback {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+
+.attack-title {
+  color: rgba(229, 223, 209, 0.6);
+}
+
+#attack-cooldown-label {
+  color: #e5c98f;
+}
+
+.attack-cooldown-track {
+  width: 100%;
+  height: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+#attack-cooldown-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #d8b77c;
+  box-shadow: 0 0 8px rgba(216, 183, 124, 0.55);
+  transform: scaleX(1);
+  transform-origin: left center;
+}
+
+#combat-feedback {
+  min-height: 10px;
+  color: rgba(229, 223, 209, 0.64);
+}

@@ -2,9 +2,12 @@ import {
   BoxGeometry,
   BufferGeometry,
   CapsuleGeometry,
+  DoubleSide,
+  Float32BufferAttribute,
   Group,
   Material,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   MathUtils,
   Sphere,
@@ -26,6 +29,7 @@ export class EnemyDummy {
   private readonly scene: Scene;
   private readonly root = new Group();
   private readonly healthBar = new Group();
+  private attackTelegraph!: Mesh<BufferGeometry, MeshBasicMaterial>;
   private readonly leftArmPivot = new Group();
   private readonly rightArmPivot = new Group();
   private readonly leftLegPivot = new Group();
@@ -91,6 +95,7 @@ export class EnemyDummy {
 
     this.createModel();
     this.createHealthBar();
+    this.createAttackTelegraph();
 
     this.scene.add(this.root);
   }
@@ -140,10 +145,35 @@ export class EnemyDummy {
     );
   }
 
+  get forwardDirection(): Vector3 {
+    return new Vector3(
+      Math.sin(this.root.rotation.y),
+      0,
+      Math.cos(this.root.rotation.y),
+    );
+  }
+
+  faceTargetImmediately(target: Vector3): void {
+    const dx = target.x - this.root.position.x;
+    const dz = target.z - this.root.position.z;
+
+    if (dx * dx + dz * dz < 0.0001) return;
+    this.root.rotation.y = Math.atan2(dx, dz);
+  }
+
   setCombatPose(pose: 'IDLE' | 'WINDUP' | 'RECOVERY'): void {
     if (this.combatPose === pose) return;
 
     this.combatPose = pose;
+    this.attackTelegraph.visible = pose === 'WINDUP';
+
+    if (pose === 'WINDUP') {
+      this.attackTelegraph.material.opacity = 0.18;
+      this.attackTelegraph.scale.set(0.96, 1, 0.96);
+    } else {
+      this.attackTelegraph.material.opacity = 0;
+      this.attackTelegraph.scale.set(1, 1, 1);
+    }
 
     if (pose === 'RECOVERY') {
       this.attackAnimationTimer = 0.38;
@@ -179,6 +209,13 @@ export class EnemyDummy {
     }
 
     this.elapsedTime += deltaTime;
+
+    if (this.combatPose === 'WINDUP') {
+      const pulse = 0.5 + 0.5 * Math.sin(this.elapsedTime * 20);
+      const scale = 0.94 + pulse * 0.06;
+      this.attackTelegraph.material.opacity = 0.14 + pulse * 0.2;
+      this.attackTelegraph.scale.set(scale, 1, scale);
+    }
 
     // Derive locomotion from actual horizontal displacement, not AI state.
     // This keeps the walk cycle synchronized with real movement and return motion.
@@ -282,6 +319,51 @@ export class EnemyDummy {
     for (const material of materials) {
       material.dispose();
     }
+  }
+
+  private createAttackTelegraph(): void {
+    const radius = 1.72;
+    const halfAngle = Math.PI / 3;
+    const segments = 28;
+    const positions: number[] = [0, 0, 0];
+    const indices: number[] = [];
+
+    for (let index = 0; index <= segments; index += 1) {
+      const angle = -halfAngle + (2 * halfAngle * index) / segments;
+      positions.push(
+        Math.sin(angle) * radius,
+        0,
+        Math.cos(angle) * radius,
+      );
+    }
+
+    for (let index = 0; index < segments; index += 1) {
+      indices.push(0, index + 1, index + 2);
+    }
+
+    const geometry = new BufferGeometry();
+    geometry.setAttribute(
+      'position',
+      new Float32BufferAttribute(positions, 3),
+    );
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+
+    this.attackTelegraph = new Mesh(
+      geometry,
+      new MeshBasicMaterial({
+        color: 0xffb347,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        side: DoubleSide,
+        toneMapped: false,
+      }),
+    );
+    this.attackTelegraph.position.y = 0.025;
+    this.attackTelegraph.visible = false;
+    this.attackTelegraph.renderOrder = 2;
+    this.root.add(this.attackTelegraph);
   }
 
   private createModel(): void {

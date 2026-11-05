@@ -303,7 +303,12 @@ export class Game {
     );
 
     if (deltaTime > 0) {
+      const previousEnemyState = this.enemyAI.state;
       const enemyAttack = this.enemyAI.update(deltaTime);
+      if (previousEnemyState !== 'WINDUP' && this.enemyAI.state === 'WINDUP') {
+        this.showCombatFeedback('INCOMING ATTACK');
+      }
+
       if (enemyAttack === 'HIT') {
         this.showCombatFeedback('ENEMY HIT');
       } else if (enemyAttack === 'BLOCKED') {

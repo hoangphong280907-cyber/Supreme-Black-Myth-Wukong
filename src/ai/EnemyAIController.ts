@@ -20,6 +20,7 @@ const RETURN_SPEED = 2.8;
 const ATTACK_RANGE = 1.5;
 const ATTACK_CANCEL_RANGE = 1.95;
 const STRIKE_RANGE = 1.72;
+const ATTACK_HALF_ANGLE = Math.PI / 3;
 const STOP_DISTANCE = 1.08;
 const ATTACK_WINDUP = 0.82;
 const ATTACK_RECOVERY = 1.35;
@@ -30,6 +31,7 @@ export class EnemyAIController {
   private readonly player: PlayerController;
   private readonly homePosition: Vector3;
   private readonly direction = new Vector3();
+  private readonly lockedAttackDirection = new Vector3();
 
   private currentState: EnemyAIState = 'IDLE';
   private stateTimer = 0;
@@ -85,6 +87,10 @@ export class EnemyAIController {
         this.enemy.faceTarget(this.player.position, deltaTime);
 
         if (distanceToPlayer <= ATTACK_RANGE) {
+          // Lock the attack direction at the start of the telegraph.
+          // The enemy must not rotate to track the player during windup.
+          this.enemy.faceTargetImmediately(this.player.position);
+          this.lockedAttackDirection.copy(this.enemy.forwardDirection);
           this.transition('WINDUP');
           break;
         }
@@ -99,7 +105,7 @@ export class EnemyAIController {
       }
 
       case 'WINDUP': {
-        this.enemy.faceTarget(this.player.position, deltaTime);
+        // The facing direction is locked; the ground wedge shows this exact hit zone.
         this.stateTimer += deltaTime;
 
         if (distanceToPlayer > ATTACK_CANCEL_RANGE) {
@@ -110,7 +116,22 @@ export class EnemyAIController {
         if (this.stateTimer >= ATTACK_WINDUP) {
           this.transition('RECOVERY');
 
-          if (distanceToPlayer > STRIKE_RANGE) {
+          this.direction.set(
+            this.player.position.x - this.enemy.position.x,
+            0,
+            this.player.position.z - this.enemy.position.z,
+          );
+
+          if (
+            distanceToPlayer > STRIKE_RANGE ||
+            this.direction.lengthSq() < 0.0001
+          ) {
+            return 'MISS';
+          }
+
+          this.direction.normalize();
+          const facingDot = this.lockedAttackDirection.dot(this.direction);
+          if (facingDot < Math.cos(ATTACK_HALF_ANGLE)) {
             return 'MISS';
           }
 

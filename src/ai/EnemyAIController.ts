@@ -8,6 +8,7 @@ export type EnemyAIState =
   | 'CHASE'
   | 'WINDUP'
   | 'RECOVERY'
+  | 'STAGGER'
   | 'RETURN'
   | 'DEAD';
 
@@ -25,6 +26,9 @@ const STOP_DISTANCE = 1.08;
 const ATTACK_WINDUP = 0.82;
 const ATTACK_RECOVERY = 1.35;
 const ATTACK_DAMAGE = 10;
+const STAGGER_DURATION = 0.46;
+const KNOCKBACK_DURATION = 0.16;
+const KNOCKBACK_DISTANCE = 0.58;
 
 export class EnemyAIController {
   private readonly enemy: EnemyDummy;
@@ -32,6 +36,8 @@ export class EnemyAIController {
   private readonly homePosition: Vector3;
   private readonly direction = new Vector3();
   private readonly lockedAttackDirection = new Vector3();
+  private readonly knockbackDirection = new Vector3();
+  private knockbackElapsed = 0;
 
   private currentState: EnemyAIState = 'IDLE';
   private stateTimer = 0;
@@ -44,6 +50,27 @@ export class EnemyAIController {
 
   get state(): EnemyAIState {
     return this.currentState;
+  }
+
+  applyStagger(sourcePosition: Vector3): void {
+    if (!this.enemy.isAlive) return;
+
+    this.knockbackDirection.set(
+      this.enemy.position.x - sourcePosition.x,
+      0,
+      this.enemy.position.z - sourcePosition.z,
+    );
+
+    if (this.knockbackDirection.lengthSq() < 0.0001) {
+      this.knockbackDirection.copy(this.enemy.forwardDirection);
+    } else {
+      this.knockbackDirection.normalize();
+    }
+
+    this.knockbackElapsed = 0;
+    this.stateTimer = 0;
+    this.currentState = 'STAGGER';
+    this.enemy.setCombatPose('STAGGER');
   }
 
   update(deltaTime: number): EnemyAttackOutcome | null {
@@ -155,6 +182,32 @@ export class EnemyAIController {
         break;
       }
 
+      case 'STAGGER': {
+        const previousProgress = Math.min(
+          this.knockbackElapsed / KNOCKBACK_DURATION,
+          1,
+        );
+        this.knockbackElapsed = Math.min(
+          KNOCKBACK_DURATION,
+          this.knockbackElapsed + deltaTime,
+        );
+        const currentProgress = this.knockbackElapsed / KNOCKBACK_DURATION;
+        const previousEase = 1 - (1 - previousProgress) ** 2;
+        const currentEase = 1 - (1 - currentProgress) ** 2;
+        const knockbackStep = KNOCKBACK_DISTANCE * (currentEase - previousEase);
+
+        this.enemy.position.x += this.knockbackDirection.x * knockbackStep;
+        this.enemy.position.z += this.knockbackDirection.z * knockbackStep;
+        this.stateTimer += deltaTime;
+
+        if (this.stateTimer >= STAGGER_DURATION) {
+          const shouldReturn =
+            !this.player.isAlive || distanceFromHome > LEASH_RADIUS;
+          this.transition(shouldReturn ? 'RETURN' : 'CHASE');
+        }
+        break;
+      }
+
       case 'RETURN': {
         const distanceHome = this.horizontalDistance(
           this.enemy.position,
@@ -190,6 +243,8 @@ export class EnemyAIController {
       this.enemy.setCombatPose('WINDUP');
     } else if (nextState === 'RECOVERY') {
       this.enemy.setCombatPose('RECOVERY');
+    } else if (nextState === 'STAGGER') {
+      this.enemy.setCombatPose('STAGGER');
     } else {
       this.enemy.setCombatPose('IDLE');
     }

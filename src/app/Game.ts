@@ -343,7 +343,9 @@ export class Game {
       if (attackResolution) {
         this.showCombatFeedback(attackResolution);
 
-        if (attackResolution === 'DEFEATED') {
+        if (attackResolution === 'HIT') {
+          this.enemyAI.applyStagger(this.player.position);
+        } else if (attackResolution === 'DEFEATED') {
           physics.removeTrainingDummyCollider();
         }
       }

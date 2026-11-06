@@ -78,8 +78,9 @@ export class EnemyDummy {
   private walkPhase = 0;
   private movementBlend = 0;
   private hitFlashTimer = 0;
-  private combatPose: 'IDLE' | 'WINDUP' | 'RECOVERY' = 'IDLE';
+  private combatPose: 'IDLE' | 'WINDUP' | 'RECOVERY' | 'STAGGER' = 'IDLE';
   private attackAnimationTimer = 0;
+  private hitReactionBlend = 0;
   private disposed = false;
 
   constructor(
@@ -161,7 +162,7 @@ export class EnemyDummy {
     this.root.rotation.y = Math.atan2(dx, dz);
   }
 
-  setCombatPose(pose: 'IDLE' | 'WINDUP' | 'RECOVERY'): void {
+  setCombatPose(pose: 'IDLE' | 'WINDUP' | 'RECOVERY' | 'STAGGER'): void {
     if (this.combatPose === pose) return;
 
     this.combatPose = pose;
@@ -177,7 +178,7 @@ export class EnemyDummy {
 
     if (pose === 'RECOVERY') {
       this.attackAnimationTimer = 0.38;
-    } else if (pose === 'IDLE') {
+    } else if (pose === 'IDLE' || pose === 'STAGGER') {
       this.attackAnimationTimer = 0;
     }
   }
@@ -238,15 +239,24 @@ export class EnemyDummy {
 
     this.root.rotation.z =
       Math.sin(this.elapsedTime * 0.9) * 0.012;
+    this.root.rotation.x = -this.hitReactionBlend * 0.12;
 
     this.attackAnimationTimer = Math.max(
       0,
       this.attackAnimationTimer - deltaTime,
     );
 
+    const hitReactionTarget = this.combatPose === 'STAGGER' ? 1 : 0;
+    const hitReactionResponse = 1 - Math.exp(-22 * deltaTime);
+    this.hitReactionBlend +=
+      (hitReactionTarget - this.hitReactionBlend) * hitReactionResponse;
+
     const walkArmSwing = Math.sin(this.walkPhase) * 0.16 * this.movementBlend;
     let desiredRightArm = this.combatPose === 'WINDUP' ? 0.78 : -walkArmSwing;
-    const desiredLeftArm = this.combatPose === 'WINDUP' ? -0.18 : walkArmSwing;
+    let desiredLeftArm = this.combatPose === 'WINDUP' ? -0.18 : walkArmSwing;
+
+    desiredRightArm = MathUtils.lerp(desiredRightArm, -1.02, this.hitReactionBlend);
+    desiredLeftArm = MathUtils.lerp(desiredLeftArm, -0.78, this.hitReactionBlend);
 
     if (this.attackAnimationTimer > 0) {
       const progress = 1 - this.attackAnimationTimer / 0.38;

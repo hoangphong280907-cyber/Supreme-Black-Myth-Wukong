@@ -33,6 +33,8 @@ app.innerHTML = `
     </div>
   </header>
 
+  <div class="damage-vignette" id="damage-vignette" aria-hidden="true"></div>
+
   <section class="death-overlay" id="death-overlay" hidden aria-live="assertive">
     <div class="death-panel">
       <span class="death-kicker">THE JOURNEY IS NOT OVER</span>

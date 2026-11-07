@@ -7,6 +7,7 @@ import { EnemyAIController } from '../ai/EnemyAIController';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
 import { GameRenderer } from '../renderer/GameRenderer';
 import { WorldScene } from '../scenes/WorldScene';
+import { CombatImpactEffect } from '../effects/CombatImpactEffect';
 
 export class Game {
   private readonly renderer: GameRenderer;
@@ -18,6 +19,7 @@ export class Game {
   private readonly enemyDummy: EnemyDummy;
   private readonly combat: MeleeCombatSystem;
   private readonly enemyAI: EnemyAIController;
+  private readonly impactEffect: CombatImpactEffect;
 
   private readonly dodgeCooldownFill: HTMLElement | null;
   private readonly dodgeCooldownLabel: HTMLElement | null;
@@ -28,8 +30,11 @@ export class Game {
   private readonly playerHealthLabel: HTMLElement | null;
   private readonly deathOverlay: HTMLElement | null;
   private readonly respawnCountdownLabel: HTMLElement | null;
+  private readonly damageVignette: HTMLElement | null;
 
   private combatFeedbackTimer = 0;
+  private hitStopRemaining = 0;
+  private damageFeedbackRemaining = 0;
   private respawnTimer = 0;
   private deathSequenceActive = false;
 
@@ -67,6 +72,7 @@ export class Game {
       this.enemyDummy,
       this.player,
     );
+    this.impactEffect = new CombatImpactEffect(this.world.scene);
 
     const appRoot = viewport.parentElement;
 
@@ -92,6 +98,8 @@ export class Game {
       appRoot?.querySelector<HTMLElement>('#death-overlay') ?? null;
     this.respawnCountdownLabel =
       appRoot?.querySelector<HTMLElement>('#respawn-countdown') ?? null;
+    this.damageVignette =
+      appRoot?.querySelector<HTMLElement>('#damage-vignette') ?? null;
 
     window.addEventListener('resize', this.handleResize);
     this.handleResize();
@@ -140,6 +148,7 @@ export class Game {
     window.removeEventListener('resize', this.handleResize);
 
     this.input.dispose();
+    this.impactEffect.dispose();
     this.player.dispose();
     this.enemyDummy.dispose();
 
@@ -209,6 +218,24 @@ export class Game {
     this.combatFeedbackTimer = 0.9;
   }
 
+  private triggerDamageFeedback(): void {
+    this.damageFeedbackRemaining = 0.28;
+    this.damageVignette?.classList.add('active');
+  }
+
+  private updateDamageFeedback(deltaTime: number): void {
+    if (this.damageFeedbackRemaining <= 0 || deltaTime <= 0) return;
+
+    this.damageFeedbackRemaining = Math.max(
+      0,
+      this.damageFeedbackRemaining - deltaTime,
+    );
+
+    if (this.damageFeedbackRemaining === 0) {
+      this.damageVignette?.classList.remove('active');
+    }
+  }
+
   private updatePlayerHealthHud(): void {
     const health = this.player.health;
 
@@ -272,6 +299,18 @@ export class Game {
         : Math.min((time - this.previousFrameTime) / 1000, 0.05);
 
     this.previousFrameTime = time;
+
+    if (this.hitStopRemaining > 0 && deltaTime > 0) {
+      this.hitStopRemaining = Math.max(0, this.hitStopRemaining - deltaTime);
+      this.input.consumePointerDelta();
+      this.input.consumeWheelDelta();
+      this.input.consumeDodgeRequest();
+      this.input.consumeAttackRequest();
+      this.input.consumeJumpRequest();
+      this.renderer.render(this.world.scene, this.camera.camera);
+      return;
+    }
+
     this.elapsedTime += deltaTime;
 
     const pointerDelta = this.input.consumePointerDelta();
@@ -311,6 +350,7 @@ export class Game {
 
       if (enemyAttack === 'HIT') {
         this.showCombatFeedback('ENEMY HIT');
+        this.triggerDamageFeedback();
       } else if (enemyAttack === 'BLOCKED') {
         this.showCombatFeedback('DODGED');
       } else if (enemyAttack === 'MISS') {
@@ -319,6 +359,7 @@ export class Game {
 
       this.updateDeathSequence(deltaTime, physics);
       this.enemyDummy.update(deltaTime);
+      this.impactEffect.update(deltaTime);
 
       const groundHeight = physics.getGroundHeight(this.enemyDummy.position);
       if (groundHeight !== null) {
@@ -345,7 +386,11 @@ export class Game {
 
         if (attackResolution === 'HIT') {
           this.enemyAI.applyStagger(this.player.position);
+          this.impactEffect.trigger(this.enemyDummy.position, this.player.position);
+          this.hitStopRemaining = Math.max(this.hitStopRemaining, 0.045);
         } else if (attackResolution === 'DEFEATED') {
+          this.impactEffect.trigger(this.enemyDummy.position, this.player.position);
+          this.hitStopRemaining = Math.max(this.hitStopRemaining, 0.065);
           physics.removeTrainingDummyCollider();
         }
       }
@@ -361,6 +406,7 @@ export class Game {
     this.updateDodgeHud();
     this.updateAttackHud(deltaTime);
     this.updatePlayerHealthHud();
+    this.updateDamageFeedback(deltaTime);
 
     this.camera.update(
       this.player.position,

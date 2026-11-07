@@ -70,6 +70,24 @@ body {
     );
 }
 
+.damage-vignette {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(120, 12, 20, 0) 38%,
+    rgba(178, 28, 36, 0.42) 100%
+  );
+  transition: opacity 90ms ease-out;
+}
+
+.damage-vignette.active {
+  opacity: 1;
+}
+
 .hud {
   position: absolute;
   z-index: 2;
@@ -246,6 +264,10 @@ body {
   *::before,
   *::after {
     scroll-behavior: auto !important;
+  }
+
+  .damage-vignette {
+    transition: none;
   }
 }
 
